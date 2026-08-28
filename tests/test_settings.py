@@ -2,6 +2,7 @@ import sys
 from pathlib import Path
 
 import pytest
+from src.settings import get_customer_pipeline_name, get_customer_invalid_rate_threshold
 
 
 SRC_PATH = Path(__file__).resolve().parents[1] / "src"
@@ -11,6 +12,25 @@ if str(SRC_PATH) not in sys.path:
 
 
 from settings import get_customer_invalid_rate_threshold
+
+def test_default_pipeline_name(monkeypatch):
+    monkeypatch.delenv(
+        "NORTHSTAR_CUSTOMER_PIPELINE_NAME",
+        raising=False
+    )
+
+    assert get_customer_pipeline_name() == "customer_pipeline"
+
+    
+
+
+def test_pipeline_name_can_be_configured(monkeypatch):
+    monkeypatch.setenv(
+        "NORTHSTAR_CUSTOMER_PIPELINE_NAME",
+        "customer_pipeline_dev"
+    )
+
+    assert get_customer_pipeline_name() == "customer_pipeline_dev"
 
 
 def test_default_threshold(monkeypatch):

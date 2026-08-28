@@ -1,5 +1,10 @@
 import os
 
+def get_customer_pipeline_name() -> str:
+    return os.getenv(
+        "NORTHSTAR_CUSTOMER_PIPELINE_NAME",
+        "customer_pipeline"
+    )
 
 def get_customer_invalid_rate_threshold() -> float:
     raw_value = os.getenv(
