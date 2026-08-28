@@ -1,5 +1,4 @@
 import os
-
 import pyodbc
 
 
@@ -10,11 +9,25 @@ def _build_connection_string(database: str) -> str:
         "ODBC Driver 17 for SQL Server",
     )
 
+    username = os.getenv("NORTHSTAR_SQL_USERNAME")
+    password = os.getenv("NORTHSTAR_SQL_PASSWORD")
+
+    if username and password:
+        return (
+            f"DRIVER={{{driver}}};"
+            f"SERVER={server};"
+            f"DATABASE={database};"
+            f"UID={username};"
+            f"PWD={password};"
+            "TrustServerCertificate=yes;"
+        )
+
     return (
         f"DRIVER={{{driver}}};"
         f"SERVER={server};"
         f"DATABASE={database};"
         "Trusted_Connection=yes;"
+        "TrustServerCertificate=yes;"
     )
 
 
