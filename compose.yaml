@@ -1,0 +1,15 @@
+services:
+  northstar-pipeline:
+    build:
+      context: .
+    image: northstar-data-platform:dev
+
+    environment:
+      NORTHSTAR_SQL_SERVER: host.docker.internal
+      NORTHSTAR_SQL_DRIVER: ODBC Driver 18 for SQL Server
+      NORTHSTAR_SQL_USERNAME: northstar_pipeline
+      NORTHSTAR_SQL_PASSWORD: ${NORTHSTAR_SQL_PASSWORD}
+
+    command:
+      - python
+      - src/run_customer_pipeline.py
