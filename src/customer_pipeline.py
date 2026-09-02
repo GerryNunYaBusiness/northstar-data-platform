@@ -1,5 +1,6 @@
 from dataclasses import dataclass
-import uuid
+from uuid import UUID, uuid4
+from database import get_warehouse_connection
 from settings import get_customer_invalid_rate_threshold
 
 from ingestion.customers import (
@@ -7,6 +8,7 @@ from ingestion.customers import (
     get_valid_customers,
     load_raw_customers,
     quarantine_customer_errors,
+    raw_customer_batch_exists,
     validate_customers,
 )
 
@@ -32,13 +34,37 @@ class StageResult:
 
 @dataclass
 class CustomerPipelineResult:
-    pipeline_run_id: str
+    pipeline_run_id: UUID
     status: str
+    batch_id: UUID
     stages: list[StageResult]
 
+def load_bronze_for_batch(
+    customers,
+    pipeline_run_id,
+    batch_id,
+):
+    with get_warehouse_connection() as connection:
+        if raw_customer_batch_exists(
+            connection,
+            batch_id,
+        ):
+            return 0
 
-def run_customer_pipeline() -> CustomerPipelineResult:
-    pipeline_run_id = uuid.uuid4()
+    return load_raw_customers(
+        customers,
+        pipeline_run_id,
+        batch_id,
+    )
+
+def run_customer_pipeline(
+    batch_id: UUID | None = None,
+) -> CustomerPipelineResult:
+    pipeline_run_id = uuid4()
+
+    if batch_id is None:
+        batch_id = uuid4()
+
     stages: list[StageResult] = []
 
     start_pipeline_run(
@@ -124,10 +150,16 @@ def run_customer_pipeline() -> CustomerPipelineResult:
             pipeline_run_id,
             "load_bronze_customers",
         ) as stage:
-
-            bronze_rows = load_raw_customers(
-                valid_customers,
-                pipeline_run_id,
+            if raw_customer_batch_exists(
+                get_warehouse_connection(),
+                batch_id,
+            ):
+                bronze_rows = 0
+            else:
+                bronze_rows = load_raw_customers(
+                    valid_customers,
+                    pipeline_run_id,
+                    batch_id,
             )
 
             stage["rows_processed"] = bronze_rows
@@ -172,8 +204,9 @@ def run_customer_pipeline() -> CustomerPipelineResult:
         )
 
         return CustomerPipelineResult(
-            pipeline_run_id=str(pipeline_run_id),
+            pipeline_run_id=pipeline_run_id,
             status="SUCCESS",
+            batch_id=batch_id,
             stages=stages,
         )
 

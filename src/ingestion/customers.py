@@ -1,6 +1,6 @@
 import hashlib
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from uuid import UUID
 
 from database import (
@@ -22,6 +22,21 @@ class CustomerValidationError:
     customer: CustomerRecord
     rule: str
     message: str
+
+def raw_customer_batch_exists(
+    connection,
+    batch_id,
+) -> bool:
+    row = connection.execute(
+        """
+        SELECT TOP (1) 1
+        FROM raw.Customers AS RC
+        WHERE RC.BatchID = ?
+        """,
+        str(batch_id),
+    ).fetchone()
+
+    return row is not None
 
 def extract_customers() -> list[CustomerRecord]:
     customers: list[CustomerRecord] = []
@@ -114,9 +129,12 @@ def validate_customers(
 def load_raw_customers(
     customers: list[CustomerRecord],
     pipeline_run_id: UUID,
+    batch_id: UUID
 ) -> int:
-
-    ingested_at = datetime.utcnow()
+    if not customers:
+        return 0
+    
+    ingested_at = datetime.now(timezone.utc)
 
     rows = [
         (
@@ -128,6 +146,7 @@ def load_raw_customers(
             customer.created_at,
             ingested_at,
             str(pipeline_run_id),
+            str(batch_id),
             calculate_customer_hash(customer),
         )
         for customer in customers
@@ -150,9 +169,10 @@ def load_raw_customers(
                 CreatedAt,
                 IngestedAt,
                 PipelineRunID,
+                BatchID,
                 RecordHash
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?,?);
             """,
             rows,
         )
