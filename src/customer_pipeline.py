@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from uuid import UUID, uuid4
 from database import get_warehouse_connection
+from monitoring.pipeline_batches import batch_is_successful
 from settings import get_customer_invalid_rate_threshold
 
 from ingestion.customers import (
@@ -44,12 +45,8 @@ def load_bronze_for_batch(
     pipeline_run_id,
     batch_id,
 ):
-    with get_warehouse_connection() as connection:
-        if raw_customer_batch_exists(
-            connection,
-            batch_id,
-        ):
-            return 0
+    if batch_is_successful(batch_id):
+        return 0
 
     return load_raw_customers(
         customers,
