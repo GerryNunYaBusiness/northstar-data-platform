@@ -1,10 +1,9 @@
 from pathlib import Path
 import sys
-from unittest import result
 from unittest.mock import MagicMock, patch
 from uuid import uuid4
 
-from datetime import datetime, timezone
+from datetime import datetime
 
 SRC_PATH = Path(__file__).resolve().parents[1] / "src"
 
@@ -142,29 +141,3 @@ def test_pipeline_generates_batch_id_when_not_supplied():
     assert result.batch_id is not None
     assert result.pipeline_run_id != result.batch_id
     
-#@dataclass
-#class TestCustomerRecord:
-#    BatchID: UUID
-#    PipelineRunID: UUID
-#    CustomerID: int
-
-
-#def get_test_customer(connection:pyodbc.Connection ) -> TestCustomerRecord:
-    
-#    cursor = connection.cursor()
-
-#    row = cursor.execute("""
-#        SELECT TOP (1) 
-#        BatchID,
-#        PipelineRunID,
-#        CustomerID
-#        FROM raw.Customers AS RC
-#        """).fetchone()
-#    if row is None:
-#        raise ValueError("No records found in raw.customers")
-    
-#    return TestCustomerRecord(
-#        BatchID=UUID(str(row.BatchID)),
-#        PipelineRunID=UUID(str(row.PipelineRunID)),
-#        CustomerID=int(row.CustomerID),
-#    )

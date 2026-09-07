@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from uuid import UUID, uuid4
 from database import get_warehouse_connection
 from monitoring.pipeline_batches import batch_is_successful
-from settings import get_customer_invalid_rate_threshold
+from settings import get_customer_invalid_rate_threshold , get_customer_pipeline_name
 
 from ingestion.customers import (
     extract_customers,
@@ -19,6 +19,11 @@ from monitoring.pipeline_runs import (
     complete_pipeline_run,
     pipeline_stage,
     start_pipeline_run,
+)
+
+from monitoring.pipeline_batches import (
+    begin_or_retry_batch,
+    complete_batch,
 )
 
 invalid_rate_threshold = (
@@ -57,19 +62,35 @@ def load_bronze_for_batch(
 def run_customer_pipeline(
     batch_id: UUID | None = None,
 ) -> CustomerPipelineResult:
+    
     pipeline_run_id = uuid4()
 
     if batch_id is None:
         batch_id = uuid4()
 
-    stages: list[StageResult] = []
+    pipeline_name = get_customer_pipeline_name()
+
 
     start_pipeline_run(
-        pipeline_run_id,
-        "customer_pipeline",
+        pipeline_run_id=pipeline_run_id,
+        pipeline_name=pipeline_name,
     )
 
+    stages: list[StageResult] = []
+
+    # start_pipeline_run(
+    #     pipeline_run_id,
+    #     "customer_pipeline",
+    # )
+    batch_started = False
+
     try:
+        begin_or_retry_batch(
+            batch_id=batch_id,
+            pipeline_name=pipeline_name,
+        )
+
+        batch_started = True
 
         with pipeline_stage(
             pipeline_run_id,
@@ -194,6 +215,11 @@ def run_customer_pipeline(
                 ),
             )
         )
+        complete_batch(
+            batch_id=batch_id,
+            status="SUCCESS",
+            rows_processed=bronze_rows,
+        )
 
         complete_pipeline_run(
             pipeline_run_id,
@@ -208,6 +234,13 @@ def run_customer_pipeline(
         )
 
     except Exception as exc:
+
+        if batch_started:
+            complete_batch(
+                batch_id=batch_id,
+                status="FAILED",
+                error_message=str(exc),
+            )
 
         complete_pipeline_run(
             pipeline_run_id,

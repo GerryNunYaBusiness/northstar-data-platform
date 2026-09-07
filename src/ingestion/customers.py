@@ -1,6 +1,7 @@
 import hashlib
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from multiprocessing import connection
 from uuid import UUID
 
 from database import (
@@ -126,27 +127,79 @@ def validate_customers(
 
     return errors
 
+# def load_raw_customers(
+#     customers: list[CustomerRecord],
+#     pipeline_run_id: UUID,
+#     batch_id: UUID
+# ) -> int:
+#     if not customers:
+#         return 0
+    
+#     ingested_at = datetime.now(timezone.utc)
+
+#     rows = [
+#         (
+#             customer.customer_id,
+#             customer.first_name,
+#             customer.last_name,
+#             customer.email,
+#             customer.phone,
+#             customer.created_at,
+#             ingested_at,
+#             str(pipeline_run_id),
+#             str(batch_id),
+#             calculate_customer_hash(customer),
+#         )
+#         for customer in customers
+#     ]
+
+#     with get_warehouse_connection() as connection:
+#         cursor = connection.cursor()
+
+#         cursor.fast_executemany = True
+
+#         cursor.executemany(
+#             """
+#             INSERT INTO raw.Customers
+#             (
+#                 CustomerID,
+#                 FirstName,
+#                 LastName,
+#                 Email,
+#                 Phone,
+#                 CreatedAt,
+#                 IngestedAt,
+#                 PipelineRunID,
+#                 BatchID,
+#                 RecordHash
+#             )
+#             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?,?);
+#             """,
+#             rows,
+#         )
+
+#         connection.commit()
+
+#     return len(rows)
+
 def load_raw_customers(
     customers: list[CustomerRecord],
     pipeline_run_id: UUID,
-    batch_id: UUID
+    batch_id: UUID,
 ) -> int:
+
     if not customers:
         return 0
-    
-    ingested_at = datetime.now(timezone.utc)
 
     rows = [
         (
+            str(pipeline_run_id),
             customer.customer_id,
             customer.first_name,
             customer.last_name,
             customer.email,
             customer.phone,
             customer.created_at,
-            ingested_at,
-            str(pipeline_run_id),
-            str(batch_id),
             calculate_customer_hash(customer),
         )
         for customer in customers
@@ -155,31 +208,56 @@ def load_raw_customers(
     with get_warehouse_connection() as connection:
         cursor = connection.cursor()
 
+        cursor.execute(
+            """
+            DELETE FROM raw.CustomerBatchStage
+            WHERE PipelineRunID = ?;
+            """,
+            str(pipeline_run_id),
+        )
+
         cursor.fast_executemany = True
 
         cursor.executemany(
             """
-            INSERT INTO raw.Customers
+            INSERT INTO raw.CustomerBatchStage
             (
+                PipelineRunID,
                 CustomerID,
                 FirstName,
                 LastName,
                 Email,
                 Phone,
                 CreatedAt,
-                IngestedAt,
-                PipelineRunID,
-                BatchID,
                 RecordHash
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?,?);
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?);
             """,
             rows,
         )
 
+        row = cursor.execute(
+            """
+            EXEC raw.usp_LoadCustomersForBatch
+                @BatchID = ?,
+                @PipelineRunID = ?;
+            """,
+            str(batch_id),
+            str(pipeline_run_id),
+        ).fetchone()
+
+        if row is None:
+            raise RuntimeError(
+                "raw.usp_LoadCustomersForBatch did not return a RowsInserted."
+            )
+
+        rows_inserted = int(row[0])
+
         connection.commit()
 
-    return len(rows)
+    return rows_inserted
+
+
 
 def quarantine_customer_errors(
     errors: list[CustomerValidationError],
