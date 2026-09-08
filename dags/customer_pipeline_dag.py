@@ -2,13 +2,26 @@
 Airflow DAG for the Northstar customer data pipeline.
 """
 from datetime import datetime, timedelta
-from uuid import NAMESPACE_URL, uuid5
+from uuid import NAMESPACE_URL, UUID, uuid4, uuid5
 
 import pendulum
 
-from airflow.sdk import dag, get_current_context, task
+from airflow.sdk import TriggerRule, dag, get_current_context, task
 
-from customer_pipeline import run_customer_pipeline
+from customer_pipeline import (
+    run_customer_bronze,
+    run_customer_silver,
+)
+from monitoring.pipeline_batches import (
+    begin_or_retry_batch,
+    complete_batch,
+)
+from monitoring.pipeline_runs import (
+    complete_pipeline_run,
+    start_pipeline_run,
+)
+from pipeline_context import PipelineContext
+from settings import get_customer_pipeline_name
 
 
 @dag(
@@ -18,45 +31,114 @@ from customer_pipeline import run_customer_pipeline
     catchup=False,
     tags=["northstar", "customers"],
 )
-
 def northstar_customer_pipeline():
+
     @task
-    def start():
-        print("Northstar customer workflow starting")
+    def prepare_run() -> dict:
+        airflow_context = get_current_context()
+        dag_run = airflow_context["dag_run"]
 
-    @task(retries=2, retry_delay=timedelta(minutes=1),    )
+        batch_id = uuid5(
+            NAMESPACE_URL,
+            f"northstar:{dag_run.run_id}",
+        )
 
-    def run_pipeline():
-        context = get_current_context()
+        pipeline_run_id = uuid4()
+        pipeline_name = get_customer_pipeline_name()
 
-        dag_run = context["dag_run"]
+        start_pipeline_run(
+            pipeline_run_id,
+            pipeline_name,
+        )
 
-        batch_id = uuid5( NAMESPACE_URL, f"northstar:{dag_run.run_id}",        )
-
-        print(f"Airflow RunID: {dag_run.run_id}")
-        print(f"Northstar BatchID: {batch_id}")
-
-        result = run_customer_pipeline(  batch_id=batch_id,        )
-
-        # print(f"PipelineRunID: {result.pipeline_run_id}")
-        # print(f"Status: {result.status}")
+        begin_or_retry_batch(
+            batch_id,
+            pipeline_name,
+        )
 
         return {
-            "pipeline_run_id": str(result.pipeline_run_id),
-            "batch_id": str(result.batch_id),
-            "status": result.status,
+            "pipeline_run_id": str(pipeline_run_id),
+            "batch_id": str(batch_id),
+        }
+
+    @task(
+        retries=2,
+        retry_delay=timedelta(minutes=1),
+    )
+    def bronze(run_info: dict) -> dict:
+        context = PipelineContext(
+            pipeline_run_id=UUID(
+                run_info["pipeline_run_id"]
+            ),
+            batch_id=UUID(
+                run_info["batch_id"]
+            ),
+        )
+
+        result = run_customer_bronze(context)
+
+        return {
+            **run_info,
+            "bronze_rows_processed": result.rows_processed,
+        }
+
+    @task(
+        retries=2,
+        retry_delay=timedelta(minutes=1),
+    )
+    def silver(run_info: dict) -> dict:
+        context = PipelineContext(
+            pipeline_run_id=UUID(
+                run_info["pipeline_run_id"]
+            ),
+            batch_id=UUID(
+                run_info["batch_id"]
+            ),
+        )
+
+        result = run_customer_silver(context)
+
+        return {
+            **run_info,
+            "silver_rows_inserted": result.rows_inserted,
+            "silver_rows_updated": result.rows_updated,
         }
 
     @task
-    def finish(result: dict):
-        print("Northstar customer workflow finished")
-        print(f"PipelineRunID: {result['pipeline_run_id']}")
-        print(f"BatchID: {result['batch_id']}")
-        print(f"Status: {result['status']}")
+    def complete_success(run_info: dict):
+        pipeline_run_id = UUID(
+            run_info["pipeline_run_id"]
+        )
 
-    start_task = start()
-    pipeline_result = run_pipeline()
-    finish_task = finish(pipeline_result)
+        batch_id = UUID(
+            run_info["batch_id"]
+        )
+
+        complete_batch(
+            batch_id,
+            status="SUCCESS",
+            rows_processed=run_info[
+                "bronze_rows_processed"
+            ],
+        )
+
+        complete_pipeline_run(
+            pipeline_run_id,
+            "SUCCESS",
+        )
+
+        print(
+            f"PipelineRunID: {pipeline_run_id}"
+        )
+        print(
+            f"BatchID: {batch_id}"
+        )
+        print("Status: SUCCESS")
+
+    run_info = prepare_run()
+    bronze_result = bronze(run_info)
+    silver_result = silver(bronze_result)
+    complete_success(silver_result)
 
 
 northstar_customer_pipeline()
