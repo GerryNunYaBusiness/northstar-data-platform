@@ -135,10 +135,42 @@ def northstar_customer_pipeline():
         )
         print("Status: SUCCESS")
 
+    @task(trigger_rule=TriggerRule.ONE_FAILED)
+    def complete_failure(run_info: dict):
+        pipeline_run_id = UUID(
+            run_info["pipeline_run_id"]
+        )
+        batch_id = UUID(
+            run_info["batch_id"]
+        )
+
+        error_message = (
+            "Airflow customer pipeline failed. "
+            "See Airflow task logs for the underlying error."
+        )
+
+        complete_batch(
+            batch_id,
+            status="FAILED",
+            error_message=error_message,
+        )
+
+        complete_pipeline_run(
+            pipeline_run_id,
+            "FAILED",
+            error_message=error_message,
+        )
+
+        print(f"PipelineRunID: {pipeline_run_id}")
+        print(f"BatchID: {batch_id}")
+        print("Status: FAILED")
+
     run_info = prepare_run()
     bronze_result = bronze(run_info)
     silver_result = silver(bronze_result)
-    complete_success(silver_result)
+    success_task = complete_success(silver_result)
+    failure_task = complete_failure(run_info)
 
+    [bronze_result, silver_result] >> failure_task
 
 northstar_customer_pipeline()
