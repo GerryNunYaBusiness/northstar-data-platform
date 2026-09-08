@@ -38,6 +38,9 @@ services:
       NORTHSTAR_WAREHOUSE_DATABASE: NorthstarWarehouse
       NORTHSTAR_SQL_USERNAME: ${NORTHSTAR_SQL_USERNAME}
       NORTHSTAR_SQL_PASSWORD: ${NORTHSTAR_SQL_PASSWORD}
+      AIRFLOW__CORE__EXECUTION_API_SERVER_URL: http://airflow-apiserver:8080/execution/
+      AIRFLOW__API_AUTH__JWT_SECRET: northstar-airflow-local-jwt-secret-change-me
+      AIRFLOW__API__SECRET_KEY: northstar-airflow-local-api-secret-change-me
 
       _AIRFLOW_DB_MIGRATE: "true"
 
@@ -70,6 +73,9 @@ services:
       NORTHSTAR_WAREHOUSE_DATABASE: NorthstarWarehouse
       NORTHSTAR_SQL_USERNAME: ${NORTHSTAR_SQL_USERNAME}
       NORTHSTAR_SQL_PASSWORD: ${NORTHSTAR_SQL_PASSWORD}
+      AIRFLOW__CORE__EXECUTION_API_SERVER_URL: http://airflow-apiserver:8080/execution/
+      AIRFLOW__API_AUTH__JWT_SECRET: northstar-airflow-local-jwt-secret-change-me
+      AIRFLOW__API__SECRET_KEY: northstar-airflow-local-api-secret-change-me     
     ports:
       - "8080:8080"
 
@@ -103,6 +109,9 @@ services:
       NORTHSTAR_WAREHOUSE_DATABASE: NorthstarWarehouse
       NORTHSTAR_SQL_USERNAME: ${NORTHSTAR_SQL_USERNAME}
       NORTHSTAR_SQL_PASSWORD: ${NORTHSTAR_SQL_PASSWORD}
+      AIRFLOW__CORE__EXECUTION_API_SERVER_URL: http://airflow-apiserver:8080/execution/
+      AIRFLOW__API_AUTH__JWT_SECRET: northstar-airflow-local-jwt-secret-change-me
+      AIRFLOW__API__SECRET_KEY: northstar-airflow-local-api-secret-change-me
 
     volumes:
       - ./dags:/opt/airflow/dags
@@ -134,7 +143,10 @@ services:
       NORTHSTAR_WAREHOUSE_DATABASE: NorthstarWarehouse
       NORTHSTAR_SQL_USERNAME: ${NORTHSTAR_SQL_USERNAME}
       NORTHSTAR_SQL_PASSWORD: ${NORTHSTAR_SQL_PASSWORD}
-      
+      AIRFLOW__CORE__EXECUTION_API_SERVER_URL: http://airflow-apiserver:8080/execution/
+      AIRFLOW__API_AUTH__JWT_SECRET: northstar-airflow-local-jwt-secret-change-me
+      AIRFLOW__API__SECRET_KEY: northstar-airflow-local-api-secret-change-me
+
     volumes:
       - ./dags:/opt/airflow/dags
       - ./logs:/opt/airflow/logs
@@ -165,6 +177,9 @@ services:
       NORTHSTAR_WAREHOUSE_DATABASE: NorthstarWarehouse
       NORTHSTAR_SQL_USERNAME: ${NORTHSTAR_SQL_USERNAME}
       NORTHSTAR_SQL_PASSWORD: ${NORTHSTAR_SQL_PASSWORD}
+      AIRFLOW__CORE__EXECUTION_API_SERVER_URL: http://airflow-apiserver:8080/execution/
+      AIRFLOW__API_AUTH__JWT_SECRET: northstar-airflow-local-jwt-secret-change-me
+      AIRFLOW__API__SECRET_KEY: northstar-airflow-local-api-secret-change-me
 
     volumes:
       - ./dags:/opt/airflow/dags
