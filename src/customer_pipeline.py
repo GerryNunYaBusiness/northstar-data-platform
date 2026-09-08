@@ -51,6 +51,15 @@ class BronzeStageResult:
     rows_processed: int
     stages: list[StageResult]
 
+@dataclass(frozen=True)
+class SilverStageResult:
+    rows_inserted: int
+    rows_updated: int
+
+    @property
+    def rows_processed(self) -> int:
+        return self.rows_inserted + self.rows_updated
+
 def load_bronze_for_batch(
     customers,
     pipeline_run_id,
@@ -206,31 +215,36 @@ def run_customer_pipeline(
         #     )
         # )
 
-        with pipeline_stage(
-            context.pipeline_run_id,
-            "load_silver_customers",
-        ) as stage:
-
-            silver_result = load_silver_customers()
-
-            silver_rows = (
-                silver_result.inserted
-                + silver_result.updated
-            )
-
-            stage["rows_processed"] = silver_rows
-
-        stages.append(
-            StageResult(
-                name="load_silver_customers",
-                status="SUCCESS",
-                rows_processed=silver_rows,
-                message=(
-                    f"inserted={silver_result.inserted} "
-                    f"updated={silver_result.updated}"
-                ),
-            )
+        silver_result = run_customer_silver(
+            context,
         )
+        ''' Moved silver customer loading to run_customer_silver function '''
+        # with pipeline_stage(
+        #     context.pipeline_run_id,
+        #     "load_silver_customers",
+        # ) as stage:
+
+        #     silver_result = load_silver_customers()
+
+        #     silver_rows = (
+        #         silver_result.inserted
+        #         + silver_result.updated
+        #     )
+
+        #     stage["rows_processed"] = silver_rows
+
+        # stages.append(
+        #     StageResult(
+        #         name="load_silver_customers",
+        #         status="SUCCESS",
+        #         rows_processed=silver_rows,
+        #         message=(
+        #             f"inserted={silver_result.inserted} "
+        #             f"updated={silver_result.updated}"
+        #         ),
+        #     )
+        # )
+
         complete_batch(
             batch_id=context.batch_id,
             status="SUCCESS",
@@ -335,4 +349,23 @@ def run_customer_bronze(
     return BronzeStageResult(
         rows_processed=rows_inserted,
         stages=stages,
+    )
+
+def run_customer_silver(
+    context: PipelineContext,
+) -> SilverStageResult:
+    with pipeline_stage(
+        context.pipeline_run_id,
+        "load_silver_customers",
+    ) as stage:
+        result = load_silver_customers()
+
+        stage["rows_processed"] = (
+            result.inserted
+            + result.updated
+        )
+
+    return SilverStageResult(
+        rows_inserted=result.inserted,
+        rows_updated=result.updated,
     )
