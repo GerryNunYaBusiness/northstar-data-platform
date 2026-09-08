@@ -27,6 +27,8 @@ from monitoring.pipeline_batches import (
     complete_batch,
 )
 
+from exceptions import DataQualityError
+
 invalid_rate_threshold = (
     get_customer_invalid_rate_threshold()
 )
@@ -324,7 +326,7 @@ def run_customer_bronze(
     threshold = get_customer_invalid_rate_threshold()
 
     if invalid_rate > threshold:
-        raise RuntimeError(
+        raise DataQualityError(
             "Customer invalid rate "
             f"{invalid_rate:.2%} exceeds threshold "
             f"{threshold:.2%}"

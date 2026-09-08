@@ -22,7 +22,7 @@ from monitoring.pipeline_runs import (
 )
 from pipeline_context import PipelineContext
 from settings import get_customer_pipeline_name
-
+from exceptions import DataQualityError
 
 @dag(
     dag_id="northstar_customer_pipeline",
@@ -31,6 +31,7 @@ from settings import get_customer_pipeline_name
     catchup=False,
     tags=["northstar", "customers"],
 )
+
 def northstar_customer_pipeline():
 
     @task
@@ -75,7 +76,27 @@ def northstar_customer_pipeline():
             ),
         )
 
-        result = run_customer_bronze(context)
+        try:
+            print(
+                "Starting customer Bronze stage "
+                f"PipelineRunID={context.pipeline_run_id} "
+                f"BatchID={context.batch_id}"
+            )
+            result = run_customer_bronze(context)
+
+        except DataQualityError:
+            print(
+                "Bronze failed because of a data-quality "
+                "policy violation."
+            )
+            raise
+
+        print(
+            "Customer Bronze stage completed "
+            f"PipelineRunID={context.pipeline_run_id} "
+            f"BatchID={context.batch_id} "
+            f"RowsProcessed={result.rows_processed}"
+        )
 
         return {
             **run_info,
