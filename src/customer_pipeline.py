@@ -46,6 +46,11 @@ class CustomerPipelineResult:
     batch_id: UUID
     stages: list[StageResult]
 
+@dataclass(frozen=True)
+class BronzeStageResult:
+    rows_processed: int
+    stages: list[StageResult]
+
 def load_bronze_for_batch(
     customers,
     pipeline_run_id,
@@ -99,104 +104,107 @@ def run_customer_pipeline(
         )
 
         batch_started = True
-
-        with pipeline_stage(
-            context.pipeline_run_id,
-            "extract_customers",
-        ) as stage:
-
-            customers = extract_customers()
-            stage["rows_processed"] = len(customers)
-
-        stages.append(
-            StageResult(
-                name="extract_customers",
-                status="SUCCESS",
-                rows_processed=len(customers),
-            )
+        bronze_result = run_customer_bronze(
+            context,
         )
+        ''' Moved code to run_customer_bronze function '''
+        # with pipeline_stage(
+        #     context.pipeline_run_id,
+        #     "extract_customers",
+        # ) as stage:
 
-        with pipeline_stage(
-            pipeline_run_id,
-            "validate_customers",
-        ) as stage:
+        #     customers = extract_customers()
+        #     stage["rows_processed"] = len(customers)
 
-            validation_errors = validate_customers(customers)
+        # stages.append(
+        #     StageResult(
+        #         name="extract_customers",
+        #         status="SUCCESS",
+        #         rows_processed=len(customers),
+        #     )
+        # )
 
-            valid_customers = get_valid_customers(
-                customers,
-                validation_errors,
-            )
+        # with pipeline_stage(
+        #     pipeline_run_id,
+        #     "validate_customers",
+        # ) as stage:
 
-            total_count = len(customers)
+        #     validation_errors = validate_customers(customers)
 
-            invalid_count = len(
-                {
-                    error.customer.customer_id
-                    for error in validation_errors
-                }
-            )
+        #     valid_customers = get_valid_customers(
+        #         customers,
+        #         validation_errors,
+        #     )
 
-            invalid_rate = (
-                invalid_count / total_count
-                if total_count
-                else 0
-            )
+        #     total_count = len(customers)
 
-            stage["rows_processed"] = total_count
+        #     invalid_count = len(
+        #         {
+        #             error.customer.customer_id
+        #             for error in validation_errors
+        #         }
+        #     )
 
-        stages.append(
-            StageResult(
-                name="validate_customers",
-                status="SUCCESS",
-                rows_processed=len(customers),
-            )
-        )
+        #     invalid_rate = (
+        #         invalid_count / total_count
+        #         if total_count
+        #         else 0
+        #     )
 
-        with pipeline_stage(
-            context.pipeline_run_id,
-            "quarantine_invalid_customers",
-        ) as stage:
+        #     stage["rows_processed"] = total_count
 
-            quarantined_rows = quarantine_customer_errors(
-                validation_errors,
-                context.pipeline_run_id,
-            )
+        # stages.append(
+        #     StageResult(
+        #         name="validate_customers",
+        #         status="SUCCESS",
+        #         rows_processed=len(customers),
+        #     )
+        # )
 
-            stage["rows_processed"] = quarantined_rows
+        # with pipeline_stage(
+        #     context.pipeline_run_id,
+        #     "quarantine_invalid_customers",
+        # ) as stage:
 
-        if invalid_rate > invalid_rate_threshold:
-            raise ValueError(
-                "Customer validation failure rate "
-                f"{invalid_rate:.2%} exceeds configured threshold "
-                f"{invalid_rate_threshold:.2%}"
-            )
+        #     quarantined_rows = quarantine_customer_errors(
+        #         validation_errors,
+        #         context.pipeline_run_id,
+        #     )
 
-        with pipeline_stage(
-            context.pipeline_run_id,
-            "load_bronze_customers",
-        ) as stage:
-            if raw_customer_batch_exists(
-                get_warehouse_connection(),
-                context.batch_id,
-            ):
-                bronze_rows = 0
-            else:
-                bronze_rows = load_raw_customers(
-                    valid_customers,
-                    context.pipeline_run_id,
-                    context.batch_id,
-            )
+        #     stage["rows_processed"] = quarantined_rows
 
-            stage["rows_processed"] = bronze_rows
+        # if invalid_rate > invalid_rate_threshold:
+        #     raise ValueError(
+        #         "Customer validation failure rate "
+        #         f"{invalid_rate:.2%} exceeds configured threshold "
+        #         f"{invalid_rate_threshold:.2%}"
+        #     )
 
-        stages.append(
-            StageResult(
-                name="load_bronze_customers",
-                status="SUCCESS",
-                rows_processed=bronze_rows,
-            )
-        )
+        # with pipeline_stage(
+        #     context.pipeline_run_id,
+        #     "load_bronze_customers",
+        # ) as stage:
+        #     if raw_customer_batch_exists(
+        #         get_warehouse_connection(),
+        #         context.batch_id,
+        #     ):
+        #         bronze_rows = 0
+        #     else:
+        #         bronze_rows = load_raw_customers(
+        #             valid_customers,
+        #             context.pipeline_run_id,
+        #             context.batch_id,
+        #     )
+
+        #     stage["rows_processed"] = bronze_rows
+
+        # stages.append(
+        #     StageResult(
+        #         name="load_bronze_customers",
+        #         status="SUCCESS",
+        #         rows_processed=bronze_rows,
+        #     )
+        # )
 
         with pipeline_stage(
             context.pipeline_run_id,
@@ -226,11 +234,11 @@ def run_customer_pipeline(
         complete_batch(
             batch_id=context.batch_id,
             status="SUCCESS",
-            rows_processed=bronze_rows,
+            rows_processed=bronze_result.rows_processed,
         )
 
         complete_pipeline_run(
-            pipeline_run_id,
+            context.pipeline_run_id,
             "SUCCESS",
         )
 
@@ -257,3 +265,74 @@ def run_customer_pipeline(
         )
 
         raise
+
+def run_customer_bronze(
+    context: PipelineContext,
+) -> BronzeStageResult:
+    stages: list[StageResult] = []
+
+    with pipeline_stage(
+        context.pipeline_run_id,
+        "extract",
+    ) as stage:
+        customers = extract_customers()
+        stage["rows_processed"] = len(customers)
+
+    with pipeline_stage(
+        context.pipeline_run_id,
+        "validate",
+    ) as stage:
+        validation_errors = validate_customers(customers)
+        invalid_customer_ids = {
+            error.customer.customer_id
+            for error in validation_errors
+        }
+
+        stage["rows_processed"] = len(customers)
+
+    if validation_errors:
+        with pipeline_stage(
+            context.pipeline_run_id,
+            "quarantine_invalid_customers",
+        ) as stage:
+            quarantine_customer_errors(
+                validation_errors,
+                context.pipeline_run_id,
+            )
+            stage["rows_processed"] = len(validation_errors)
+
+    invalid_rate = (
+        len(invalid_customer_ids) / len(customers)
+        if customers
+        else 0
+    )
+
+    threshold = get_customer_invalid_rate_threshold()
+
+    if invalid_rate > threshold:
+        raise RuntimeError(
+            "Customer invalid rate "
+            f"{invalid_rate:.2%} exceeds threshold "
+            f"{threshold:.2%}"
+        )
+
+    valid_customers = get_valid_customers(
+        customers,
+        validation_errors,
+    )
+
+    with pipeline_stage(
+        context.pipeline_run_id,
+        "load_bronze_customers",
+    ) as stage:
+        rows_inserted = load_raw_customers(
+            valid_customers,
+            context.pipeline_run_id,
+            context.batch_id,
+        )
+        stage["rows_processed"] = rows_inserted
+
+    return BronzeStageResult(
+        rows_processed=rows_inserted,
+        stages=stages,
+    )
