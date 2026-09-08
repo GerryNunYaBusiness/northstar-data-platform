@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from uuid import UUID, uuid4
 from database import get_warehouse_connection
 from monitoring.pipeline_batches import batch_is_successful
+from pipeline_context import PipelineContext
 from settings import get_customer_invalid_rate_threshold , get_customer_pipeline_name
 
 from ingestion.customers import (
@@ -61,18 +62,25 @@ def load_bronze_for_batch(
 
 def run_customer_pipeline(
     batch_id: UUID | None = None,
+    pipeline_run_id: UUID | None = None,
 ) -> CustomerPipelineResult:
     
-    pipeline_run_id = uuid4()
-
     if batch_id is None:
         batch_id = uuid4()
+    if pipeline_run_id is None:
+        pipeline_run_id = uuid4()
+
+    context = PipelineContext(
+        pipeline_run_id=pipeline_run_id,
+        batch_id=batch_id,
+    )
+
 
     pipeline_name = get_customer_pipeline_name()
 
 
     start_pipeline_run(
-        pipeline_run_id=pipeline_run_id,
+        pipeline_run_id=context.pipeline_run_id,
         pipeline_name=pipeline_name,
     )
 
@@ -86,14 +94,14 @@ def run_customer_pipeline(
 
     try:
         begin_or_retry_batch(
-            batch_id=batch_id,
+            batch_id=context.batch_id,
             pipeline_name=pipeline_name,
         )
 
         batch_started = True
 
         with pipeline_stage(
-            pipeline_run_id,
+            context.pipeline_run_id,
             "extract_customers",
         ) as stage:
 
@@ -146,13 +154,13 @@ def run_customer_pipeline(
         )
 
         with pipeline_stage(
-            pipeline_run_id,
+            context.pipeline_run_id,
             "quarantine_invalid_customers",
         ) as stage:
 
             quarantined_rows = quarantine_customer_errors(
                 validation_errors,
-                pipeline_run_id,
+                context.pipeline_run_id,
             )
 
             stage["rows_processed"] = quarantined_rows
@@ -165,19 +173,19 @@ def run_customer_pipeline(
             )
 
         with pipeline_stage(
-            pipeline_run_id,
+            context.pipeline_run_id,
             "load_bronze_customers",
         ) as stage:
             if raw_customer_batch_exists(
                 get_warehouse_connection(),
-                batch_id,
+                context.batch_id,
             ):
                 bronze_rows = 0
             else:
                 bronze_rows = load_raw_customers(
                     valid_customers,
-                    pipeline_run_id,
-                    batch_id,
+                    context.pipeline_run_id,
+                    context.batch_id,
             )
 
             stage["rows_processed"] = bronze_rows
@@ -191,7 +199,7 @@ def run_customer_pipeline(
         )
 
         with pipeline_stage(
-            pipeline_run_id,
+            context.pipeline_run_id,
             "load_silver_customers",
         ) as stage:
 
@@ -216,7 +224,7 @@ def run_customer_pipeline(
             )
         )
         complete_batch(
-            batch_id=batch_id,
+            batch_id=context.batch_id,
             status="SUCCESS",
             rows_processed=bronze_rows,
         )
@@ -227,9 +235,9 @@ def run_customer_pipeline(
         )
 
         return CustomerPipelineResult(
-            pipeline_run_id=pipeline_run_id,
+            pipeline_run_id=context.pipeline_run_id,
             status="SUCCESS",
-            batch_id=batch_id,
+            batch_id=context.batch_id,
             stages=stages,
         )
 
@@ -237,13 +245,13 @@ def run_customer_pipeline(
 
         if batch_started:
             complete_batch(
-                batch_id=batch_id,
+                batch_id=context.batch_id,
                 status="FAILED",
                 error_message=str(exc),
             )
 
         complete_pipeline_run(
-            pipeline_run_id,
+            context.pipeline_run_id,
             "FAILED",
             error_message=str(exc),
         )
