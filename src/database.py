@@ -2,7 +2,7 @@ import os
 import time
 
 import pyodbc
-
+from exceptions import TransientPipelineError
 
 def _build_connection_string(database: str) -> str:
     server = os.getenv("NORTHSTAR_SQL_SERVER", "localhost")
@@ -39,19 +39,19 @@ def _connect_with_retry(
     max_attempts: int = 3,
     delay_seconds: float = 2.0,
 ) -> pyodbc.Connection:
-    last_error = None
-
     for attempt in range(1, max_attempts + 1):
         try:
             return pyodbc.connect(
                 connection_string,
                 timeout=5,
             )
-        except pyodbc.OperationalError as exc:
-            last_error = exc
 
+        except pyodbc.OperationalError as exc:
             if attempt == max_attempts:
-                break
+                raise TransientPipelineError(
+                    "Unable to connect to SQL Server after "
+                    f"{max_attempts} attempts."
+                ) from exc
 
             print(
                 f"Database connection failed "
@@ -61,7 +61,9 @@ def _connect_with_retry(
 
             time.sleep(delay_seconds)
 
-    raise last_error
+    raise RuntimeError(
+        "Database connection retry loop ended unexpectedly."
+    )
 
 
 def get_source_connection() -> pyodbc.Connection:

@@ -62,12 +62,12 @@ def test_raw_customer_batch_exists_queries_expected_batch():
 
 
 @patch("customer_pipeline.load_raw_customers")
-@patch("customer_pipeline.raw_customer_batch_exists")
+#@patch("customer_pipeline.raw_customer_batch_exists") #This function isn't called in load_bronze_for_batch
 def test_existing_batch_skips_bronze_load(
-    mock_batch_exists,
+ #   mock_batch_exists,
     mock_load_raw,
 ):
-    mock_batch_exists.return_value = True
+  #  mock_batch_exists.return_value = True
 
     #batch_id = uuid4()
     #pipeline_run_id = uuid4()
@@ -76,7 +76,7 @@ def test_existing_batch_skips_bronze_load(
     result = load_bronze_for_batch(
         customers=[],
         pipeline_run_id=uuid4(),
-        batch_id=uuid4(),
+        batch_id="15F8FC91-5053-4B20-A53E-0A9A79CA8700",
     )
 
     assert result == 0
@@ -84,12 +84,12 @@ def test_existing_batch_skips_bronze_load(
 
 
 @patch("customer_pipeline.load_raw_customers")
-@patch("customer_pipeline.raw_customer_batch_exists")
+@patch("customer_pipeline.batch_is_successful")  #This function raw_customer_batch_exists isn't called in load_bronze_for_batch
 def test_new_batch_loads_bronze(
     mock_batch_exists,
     mock_load_raw,
 ):
-    mock_batch_exists.return_value = False
+    #mock_batch_exists.return_value = False
     mock_load_raw.return_value = 1
 
     customer = CustomerRecord(

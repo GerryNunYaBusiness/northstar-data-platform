@@ -4,7 +4,7 @@ from unittest.mock import patch
 
 import pyodbc
 import pytest
-
+from exceptions import TransientPipelineError
 
 SRC_PATH = Path(__file__).resolve().parents[1] / "src"
 
@@ -60,7 +60,7 @@ def test_connection_raises_after_max_attempts():
             "database unavailable"
         ),
     ) as mock_connect:
-        with pytest.raises(pyodbc.OperationalError):
+        with pytest.raises(TransientPipelineError, match="Unable to connect to SQL Server after 3 attempts", ):
             _connect_with_retry(
                 "fake-connection-string",
                 max_attempts=3,
@@ -68,3 +68,24 @@ def test_connection_raises_after_max_attempts():
             )
 
     assert mock_connect.call_count == 3
+
+def test_connection_preserves_original_operational_error():
+    with patch(
+        "database.pyodbc.connect",
+        side_effect=pyodbc.OperationalError(
+            "database unavailable"
+        ),
+    ):
+        with pytest.raises(
+            TransientPipelineError
+        ) as exc_info:
+            _connect_with_retry(
+                "fake-connection-string",
+                max_attempts=3,
+                delay_seconds=0,
+            )
+
+    assert isinstance(
+        exc_info.value.__cause__,
+        pyodbc.OperationalError,
+    )
