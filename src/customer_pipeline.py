@@ -27,7 +27,7 @@ from monitoring.pipeline_batches import (
     complete_batch,
 )
 
-from exceptions import DataQualityError
+from exceptions import DataQualityError, TransientPipelineError
 
 invalid_rate_threshold = (
     get_customer_invalid_rate_threshold()
@@ -282,10 +282,16 @@ def run_customer_pipeline(
 
         raise
 
+
 def run_customer_bronze(
     context: PipelineContext,
 ) -> BronzeStageResult:
     stages: list[StageResult] = []
+
+    # Use for manual testing of simulated Bronze pipeline failure
+    # raise TransientPipelineError(
+    #     "Simulated transient infrastructure failure."
+    # )
 
     with pipeline_stage(
         context.pipeline_run_id,

@@ -6,8 +6,15 @@ from uuid import NAMESPACE_URL, UUID, uuid4, uuid5
 
 import pendulum
 
-from airflow.sdk import TriggerRule, dag, get_current_context, task
-
+from airflow.sdk import (
+    ExceptionRetryPolicy,
+    RetryAction,
+    RetryRule,
+    TriggerRule, 
+    dag,
+    get_current_context,
+    task,
+)
 from customer_pipeline import (
     run_customer_bronze,
     run_customer_silver,
@@ -22,7 +29,29 @@ from monitoring.pipeline_runs import (
 )
 from pipeline_context import PipelineContext
 from settings import get_customer_pipeline_name
-from exceptions import DataQualityError
+from exceptions import DataQualityError, TransientPipelineError
+
+BRONZE_RETRY_POLICY = ExceptionRetryPolicy(
+        rules=[
+            RetryRule(
+                exception=DataQualityError,
+                action=RetryAction.FAIL,
+                reason="Data-quality failures are not retryable.",
+            ),
+            # RetryRule(
+            #     exception=ConnectionError,
+            #     action=RetryAction.RETRY,
+            #     retry_delay=timedelta(minutes=1),
+            #     reason="Transient connection failure.",
+            # ),
+            RetryRule(
+                exception=TransientPipelineError,
+                action=RetryAction.RETRY,
+                retry_delay=timedelta(minutes=1),
+                reason="Transient pipeline failure.",
+            ),
+    ]
+)
 
 @dag(
     dag_id="northstar_customer_pipeline",
@@ -65,6 +94,7 @@ def northstar_customer_pipeline():
     @task(
         retries=2,
         retry_delay=timedelta(minutes=1),
+        retry_policy=BRONZE_RETRY_POLICY,
     )
     def bronze(run_info: dict) -> dict:
         context = PipelineContext(
@@ -76,20 +106,13 @@ def northstar_customer_pipeline():
             ),
         )
 
-        try:
-            print(
-                "Starting customer Bronze stage "
-                f"PipelineRunID={context.pipeline_run_id} "
-                f"BatchID={context.batch_id}"
-            )
-            result = run_customer_bronze(context)
+        print(
+            "Starting customer Bronze stage "
+            f"PipelineRunID={context.pipeline_run_id} "
+            f"BatchID={context.batch_id}"
+        )
 
-        except DataQualityError:
-            print(
-                "Bronze failed because of a data-quality "
-                "policy violation."
-            )
-            raise
+        result = run_customer_bronze(context)
 
         print(
             "Customer Bronze stage completed "
