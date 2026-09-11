@@ -2,7 +2,12 @@
 Airflow DAG for the Northstar customer data pipeline.
 """
 from datetime import datetime, timedelta
+from multiprocessing import context
 from uuid import NAMESPACE_URL, UUID, uuid4, uuid5
+from dataclasses import dataclass
+from uuid import UUID
+
+from monitoring.failure_handler import handle_pipeline_failure
 
 import pendulum
 
@@ -30,6 +35,11 @@ from monitoring.pipeline_runs import (
 from pipeline_context import PipelineContext
 from settings import get_customer_pipeline_name
 from exceptions import DataQualityError, TransientPipelineError
+
+# from monitoring.alerts import (
+#     LoggingAlertSink,
+#     PipelineFailureContext,
+# )
 
 BRONZE_RETRY_POLICY = ExceptionRetryPolicy(
         rules=[
@@ -181,33 +191,54 @@ def northstar_customer_pipeline():
 
     @task(trigger_rule=TriggerRule.ONE_FAILED)
     def complete_failure(run_info: dict):
-        pipeline_run_id = UUID(
-            run_info["pipeline_run_id"]
+        handle_pipeline_failure(
+            pipeline_name="customer_pipeline",
+            pipeline_run_id=UUID(run_info["pipeline_run_id"]),
+            batch_id=UUID(run_info["batch_id"]),
+            stage_name="airflow",
+            error_type="PipelineFailure",
+            error_message=(
+                "Airflow customer pipeline failed. "
+                "See Airflow task logs for the underlying error."
+            ),
         )
-        batch_id = UUID(
-            run_info["batch_id"]
-        )
+    # @task(trigger_rule=TriggerRule.ONE_FAILED)
+    # def complete_failure(run_info: dict):
+    #     pipeline_run_id = UUID(run_info["pipeline_run_id"]        )
+    #     batch_id = UUID(run_info["batch_id"]        )
 
-        error_message = (
-            "Airflow customer pipeline failed. "
-            "See Airflow task logs for the underlying error."
-        )
+    #     error_message = (
+    #         "Airflow customer pipeline failed. "
+    #         "See Airflow task logs for the underlying error."
+    #     )
 
-        complete_batch(
-            batch_id,
-            status="FAILED",
-            error_message=error_message,
-        )
+    #     complete_batch(
+    #         batch_id,
+    #         status="FAILED",
+    #         error_message=error_message,
+    #     )
 
-        complete_pipeline_run(
-            pipeline_run_id,
-            "FAILED",
-            error_message=error_message,
-        )
+    #     complete_pipeline_run(
+    #         pipeline_run_id,
+    #         "FAILED",
+    #         error_message=error_message,
+    #     )
+    #     context = PipelineFailureContext(
+    #         pipeline_name="customer_pipeline",
+    #         pipeline_run_id=pipeline_run_id,
+    #         batch_id=batch_id,
+    #         stage_name="airflow",
+    #         error_type="PipelineFailure",
+    #         error_message=error_message,
+    #     )
 
-        print(f"PipelineRunID: {pipeline_run_id}")
-        print(f"BatchID: {batch_id}")
-        print("Status: FAILED")
+    #     LoggingAlertSink().send_failure(context)
+
+    
+
+        # print(f"PipelineRunID: {pipeline_run_id}")
+        # print(f"BatchID: {batch_id}")
+        # print("Status: FAILED")
 
     run_info = prepare_run()
     bronze_result = bronze(run_info)

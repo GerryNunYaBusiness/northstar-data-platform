@@ -62,12 +62,13 @@ def test_raw_customer_batch_exists_queries_expected_batch():
 
 
 @patch("customer_pipeline.load_raw_customers")
+@patch("customer_pipeline.batch_is_successful") 
 #@patch("customer_pipeline.raw_customer_batch_exists") #This function isn't called in load_bronze_for_batch
 def test_existing_batch_skips_bronze_load(
- #   mock_batch_exists,
+    mock_batch_exists,
     mock_load_raw,
 ):
-  #  mock_batch_exists.return_value = True
+    mock_batch_exists.return_value = True
 
     #batch_id = uuid4()
     #pipeline_run_id = uuid4()
@@ -89,7 +90,7 @@ def test_new_batch_loads_bronze(
     mock_batch_exists,
     mock_load_raw,
 ):
-    #mock_batch_exists.return_value = False
+    mock_batch_exists.return_value = False
     mock_load_raw.return_value = 1
 
     customer = CustomerRecord(

@@ -116,3 +116,4 @@ def test_load_raw_customers_resumes_partial_batch():
                 str(batch_id),
             )
             connection.commit()
+

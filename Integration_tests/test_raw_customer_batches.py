@@ -92,25 +92,6 @@ def test_same_customer_different_batches_is_allowed(
 ):
     customer_id = 900002
 
-    insert_raw_customer(
-        warehouse_connection,
-        customer_id=customer_id,
-        pipeline_run_id=uuid4(),
-        batch_id=uuid4(),
-    )
-
-    insert_raw_customer(
-        warehouse_connection,
-        customer_id=customer_id,
-        pipeline_run_id=uuid4(),
-        batch_id=uuid4(),
-    )
-
-def test_same_customer_different_batches_is_allowed(
-    warehouse_connection,
-):
-    customer_id = 900002
-
     batch_id_1 = uuid4()
     batch_id_2 = uuid4()
 

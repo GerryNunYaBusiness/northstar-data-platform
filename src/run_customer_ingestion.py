@@ -58,6 +58,7 @@ def main() -> int:
         rows_loaded = load_raw_customers(
             customers,
             pipeline_run_id,
+            batch_id=uuid.uuid4(),
         )
 
         logger.info(
