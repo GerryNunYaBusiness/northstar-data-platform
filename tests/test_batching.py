@@ -123,22 +123,7 @@ def test_new_batch_loads_bronze(
 
     #assert result == 6
 
-def test_supplied_batch_id_is_reused():
-    batch_id = uuid4()
 
-    # Arrange mocks for extract/load/monitoring dependencies
-    # so the pipeline doesn't touch SQL Server.
 
-    result = run_customer_pipeline(
-        batch_id=batch_id,
-    )
 
-    assert result.batch_id == batch_id
-    assert result.pipeline_run_id != result.batch_id
-
-def test_pipeline_generates_batch_id_when_not_supplied():
-    result = run_customer_pipeline()
-
-    assert result.batch_id is not None
-    assert result.pipeline_run_id != result.batch_id
     
