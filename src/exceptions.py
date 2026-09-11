@@ -9,3 +9,6 @@ class PipelineConfigurationError(NorthstarPipelineError):
 
 class TransientPipelineError(NorthstarPipelineError):
     """Raised for temporary infrastructure failures."""
+
+class InjectedPipelineFailure(NorthstarPipelineError):
+    """Raised only for controlled pipeline integration testing."""

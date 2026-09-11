@@ -18,9 +18,33 @@ class PipelineAlertSink:
     def send_failure(self, context: PipelineFailureContext) -> None:
         raise NotImplementedError
 
+# class LoggingAlertSink(PipelineAlertSink):
+#     def send_failure(self, context: PipelineFailureContext) -> None:
+#         logger.error(
+#             "Pipeline failure alert | "
+#             "pipeline=%s | "
+#             "pipeline_run_id=%s | "
+#             "batch_id=%s | "
+#             "stage=%s | "
+#             "error_type=%s | "
+#             "error_message=%s",
+#             context.pipeline_name,
+#             context.pipeline_run_id,
+#             context.batch_id,
+#             context.stage_name,
+#             context.error_type,
+#             context.error_message,
+#         )
+
 class LoggingAlertSink(PipelineAlertSink):
+    def __init__(
+        self,
+        logger: logging.Logger | None = None,
+    ) -> None:
+        self.logger = logger or logging.getLogger(__name__)
+
     def send_failure(self, context: PipelineFailureContext) -> None:
-        logger.error(
+        self.logger.error(
             "Pipeline failure alert | "
             "pipeline=%s | "
             "pipeline_run_id=%s | "

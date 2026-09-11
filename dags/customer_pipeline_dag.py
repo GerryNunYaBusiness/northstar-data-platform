@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from uuid import UUID
 
 from monitoring.failure_handler import handle_pipeline_failure
+from monitoring.alerts import LoggingAlertSink
 
 import pendulum
 
@@ -35,6 +36,10 @@ from monitoring.pipeline_runs import (
 from pipeline_context import PipelineContext
 from settings import get_customer_pipeline_name
 from exceptions import DataQualityError, TransientPipelineError
+
+import logging
+
+log = logging.getLogger(__name__)
 
 # from monitoring.alerts import (
 #     LoggingAlertSink,
@@ -191,17 +196,34 @@ def northstar_customer_pipeline():
 
     @task(trigger_rule=TriggerRule.ONE_FAILED)
     def complete_failure(run_info: dict):
+        error_message = (
+            "Airflow customer pipeline failed. "
+            "See Airflow task logs for the underlying error."
+        )
+
+        if run_info is None:
+            context = PipelineFailureContext(
+                pipeline_name="customer_pipeline",
+                pipeline_run_id=None,
+                batch_id=None,
+                stage_name="prepare_run",
+                error_type="PipelineInitializationFailure",
+                error_message=error_message,
+            )
+
+            LoggingAlertSink(log).send_failure(context)
+            return
+
         handle_pipeline_failure(
             pipeline_name="customer_pipeline",
             pipeline_run_id=UUID(run_info["pipeline_run_id"]),
             batch_id=UUID(run_info["batch_id"]),
             stage_name="airflow",
             error_type="PipelineFailure",
-            error_message=(
-                "Airflow customer pipeline failed. "
-                "See Airflow task logs for the underlying error."
-            ),
+            error_message=error_message,
+            alert_sink=LoggingAlertSink(log),
         )
+        
     # @task(trigger_rule=TriggerRule.ONE_FAILED)
     # def complete_failure(run_info: dict):
     #     pipeline_run_id = UUID(run_info["pipeline_run_id"]        )

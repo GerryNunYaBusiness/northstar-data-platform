@@ -5,6 +5,9 @@ from monitoring.pipeline_batches import batch_is_successful
 from pipeline_context import PipelineContext
 from settings import get_customer_invalid_rate_threshold , get_customer_pipeline_name
 
+from exceptions import InjectedPipelineFailure
+from settings import get_test_failure_stage
+
 from ingestion.customers import (
     extract_customers,
     get_valid_customers,
@@ -292,7 +295,16 @@ def run_customer_bronze(
     # raise TransientPipelineError(
     #     "Simulated transient infrastructure failure."
     # )
-
+    with pipeline_stage(
+        context.pipeline_run_id,
+        "bronze",
+    ) as stage:
+        if get_test_failure_stage() == "bronze":
+            raise InjectedPipelineFailure(
+                "Controlled Bronze failure requested by "
+                "NORTHSTAR_TEST_FAILURE_STAGE."
+            )
+        
     with pipeline_stage(
         context.pipeline_run_id,
         "extract",

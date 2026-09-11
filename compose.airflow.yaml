@@ -19,6 +19,7 @@ x-airflow-common-env: &airflow-common-env
 
   #NORTHSTAR_CUSTOMER_INVALID_RATE_THRESHOLD: "0"
   NORTHSTAR_CUSTOMER_INVALID_RATE_THRESHOLD: "0.05"
+  NORTHSTAR_TEST_FAILURE_STAGE: ${NORTHSTAR_TEST_FAILURE_STAGE}
 
 x-airflow-common: &airflow-common
   build:

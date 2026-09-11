@@ -16,6 +16,7 @@ from customer_pipeline import run_customer_bronze
 from exceptions import DataQualityError
 from pipeline_context import PipelineContext
 from ingestion.customers import CustomerRecord, CustomerValidationError
+from exceptions import InjectedPipelineFailure
 
 
 def make_customer(
@@ -77,4 +78,28 @@ def test_zero_invalid_rate_threshold_fails_bronze():
             }
 
             with pytest.raises(DataQualityError):
+                run_customer_bronze(context)
+
+def test_bronze_can_inject_controlled_failure():
+    context = PipelineContext(
+        pipeline_run_id=uuid4(),
+        batch_id=uuid4(),
+    )
+
+    with patch.dict(
+        os.environ,
+        {"NORTHSTAR_TEST_FAILURE_STAGE": "bronze"},
+        clear=False,
+    ):
+        with patch(
+            "customer_pipeline.pipeline_stage"
+        ) as mock_pipeline_stage:
+            mock_pipeline_stage.return_value.__enter__.return_value = {
+                "rows_processed": 0,
+            }
+
+            with pytest.raises(
+                InjectedPipelineFailure,
+                match="Controlled Bronze failure",
+            ):
                 run_customer_bronze(context)
