@@ -60,3 +60,16 @@ def get_database_retry_delay_seconds() -> float:
         )
 
     return delay
+
+def get_test_failure_stage() -> str | None:
+    value = os.getenv("NORTHSTAR_TEST_FAILURE_STAGE")
+
+    if value is None:
+        return None
+
+    value = value.strip().lower()
+
+    if not value:
+        return None
+
+    return value
