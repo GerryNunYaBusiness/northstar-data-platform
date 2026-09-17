@@ -30,6 +30,10 @@ def test_pipeline_failure_context_preserves_failure_details():
         stage_name="bronze",
         error_type="DataQualityError",
         error_message="Invalid customer rate exceeded threshold.",
+        dag_run_id= ("test_alerts_2026-09-11T18:00:00+00:00"),
+        try_number= 3,
+        # dag_run_id=dag_run_id,
+        # try_number=try_number,
     )
 
     assert context.pipeline_name == "customer_pipeline"
@@ -54,6 +58,10 @@ def test_logging_alert_sink_logs_failure_context():
         stage_name="bronze",
         error_type="DataQualityError",
         error_message="Invalid customer rate exceeded threshold.",
+        dag_run_id= ("test_alerts_2026-09-11T18:00:00+00:00"),
+        try_number= 3,
+        # dag_run_id=dag_run_id,
+        # try_number=try_number,
     )
 
     sink = LoggingAlertSink(mock_logger)

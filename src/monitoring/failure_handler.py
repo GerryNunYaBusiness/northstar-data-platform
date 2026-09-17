@@ -1,4 +1,5 @@
 from uuid import UUID
+from datetime import datetime
 
 from monitoring.alerts import (
     LoggingAlertSink,
@@ -17,6 +18,9 @@ def handle_pipeline_failure(
     stage_name: str,
     error_type: str,
     error_message: str,
+    dag_run_id: str | None = None,
+    try_number: int | None = None,
+    failed_at: datetime | None = None,
     alert_sink: PipelineAlertSink | None = None,
 ) -> None:
     complete_batch(
@@ -38,6 +42,9 @@ def handle_pipeline_failure(
         stage_name=stage_name,
         error_type=error_type,
         error_message=error_message,
+        dag_run_id=dag_run_id,
+        try_number=try_number,
+        failed_at=failed_at,
     )
 
     sink = alert_sink or LoggingAlertSink()

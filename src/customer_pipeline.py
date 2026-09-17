@@ -378,6 +378,12 @@ def run_customer_silver(
         context.pipeline_run_id,
         "load_silver_customers",
     ) as stage:
+        if get_test_failure_stage() == "silver":
+            raise InjectedPipelineFailure(
+                "Controlled Silver failure requested by "
+                "NORTHSTAR_TEST_FAILURE_STAGE."
+            )
+        
         result = load_silver_customers()
 
         stage["rows_processed"] = (
