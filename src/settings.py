@@ -73,3 +73,31 @@ def get_test_failure_stage() -> str | None:
         return None
 
     return value
+
+def get_test_transient_failure_stage() -> str | None:
+    value = os.getenv(
+        "NORTHSTAR_TEST_TRANSIENT_FAILURE_STAGE"
+    )
+
+    if value is None:
+        return None
+
+    value = value.strip().lower()
+
+    if not value:
+        return None
+
+    return value
+
+def get_pipeline_alert_webhook_url() -> str | None:
+    value = os.getenv("NORTHSTAR_PIPELINE_ALERT_WEBHOOK_URL")
+
+    if value is None:
+        return None
+
+    value = value.strip()
+
+    if not value:
+        return None
+
+    return value

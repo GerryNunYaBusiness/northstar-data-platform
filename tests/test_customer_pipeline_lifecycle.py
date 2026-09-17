@@ -133,3 +133,4 @@ def test_rejected_batch_does_not_overwrite_batch_status(
     mock_complete_batch.assert_not_called()
 
     mock_complete_pipeline.assert_called_once()
+

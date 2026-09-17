@@ -31,6 +31,8 @@ def test_handle_pipeline_failure_marks_failed_and_sends_alert():
             stage_name="bronze",
             error_type="DataQualityError",
             error_message="Invalid customer rate exceeded threshold.",
+            dag_run_id= ("test_airflow_failure_2026-09-11T18:00:00+00:00"),
+            try_number= 3,
             alert_sink=mock_sink,
         )
 

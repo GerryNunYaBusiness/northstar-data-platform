@@ -12,12 +12,11 @@ SRC_PATH = Path(__file__).resolve().parents[1] / "src"
 if str(SRC_PATH) not in sys.path:
     sys.path.insert(0, str(SRC_PATH))
 
-from customer_pipeline import run_customer_bronze
+from customer_pipeline import run_customer_bronze, run_customer_silver
 from exceptions import DataQualityError
 from pipeline_context import PipelineContext
 from ingestion.customers import CustomerRecord, CustomerValidationError
 from exceptions import InjectedPipelineFailure
-
 
 def make_customer(
     customer_id: int = 1,
@@ -103,3 +102,25 @@ def test_bronze_can_inject_controlled_failure():
                 match="Controlled Bronze failure",
             ):
                 run_customer_bronze(context)
+
+def test_run_customer_silver_can_inject_failure():
+    context = PipelineContext(
+        pipeline_run_id=uuid4(),
+        batch_id=uuid4(),
+    )
+
+    with patch.dict(
+        os.environ,
+        {
+            "NORTHSTAR_TEST_FAILURE_STAGE": "silver",
+        },
+        clear=False,
+    ):
+        with patch(
+            "customer_pipeline.pipeline_stage"
+        ):
+            with pytest.raises(
+                InjectedPipelineFailure,
+                match="Controlled Silver failure",
+            ):
+                run_customer_silver(context)
