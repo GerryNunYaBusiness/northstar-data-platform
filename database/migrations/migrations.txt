@@ -1,0 +1,2 @@
+# Applied migrations, in execution order.
+20260918_001_pipeline_events_event_type.sql
