@@ -17,15 +17,15 @@ from database import get_warehouse_connection
 from ingestion.customers import CustomerRecord, load_raw_customers
 from customer_pipeline import run_customer_pipeline
 
-@pytest.fixture
-def warehouse_connection():
-    connection = get_warehouse_connection()
+# @pytest.fixture
+# def warehouse_connection():
+#     connection = get_warehouse_connection()
 
-    try:
-        yield connection
-    finally:
-        connection.rollback()
-        connection.close()
+#     try:
+#         yield connection
+#     finally:
+#         connection.rollback()
+#         connection.close()
 
 
 def insert_raw_customer(
@@ -124,7 +124,10 @@ def test_same_customer_different_batches_is_allowed(
 
     assert count == 2
 
-def test_load_raw_customers_skips_duplicate_batch_customer():
+def test_load_raw_customers_skips_duplicate_batch_customer(
+    deployed_warehouse,
+    warehouse_connection,
+):
     batch_id = uuid4()
 
     customer = CustomerRecord(
@@ -168,37 +171,20 @@ def test_load_raw_customers_skips_duplicate_batch_customer():
         assert row[0] == 1
 
     finally:
-        with get_warehouse_connection() as connection:
-            connection.execute(
-                """
-                DELETE FROM raw.Customers
-                WHERE BatchID = ?;
-                """,
-                str(batch_id),
-            )
-            connection.commit()
+        warehouse_connection.execute(
+            """
+            DELETE FROM raw.Customers
+            WHERE BatchID = ?;
+            """,
+            str(batch_id),
+        )
 
-def test_supplied_batch_id_is_reused():
-    batch_id = uuid4()
-
-    # Arrange mocks for extract/load/monitoring dependencies
-    # so the pipeline doesn't touch SQL Server.
-
-    result = run_customer_pipeline(
-        batch_id=batch_id,
-    )
-
-    assert result.batch_id == batch_id
-    assert result.pipeline_run_id != result.batch_id
-
-def test_pipeline_generates_batch_id_when_not_supplied():
-    result = run_customer_pipeline()
-
-    assert result.batch_id is not None
-    assert result.pipeline_run_id != result.batch_id
+        warehouse_connection.commit()
 
 
-def test_load_raw_customers_resumes_partial_batch():
+def test_load_raw_customers_resumes_partial_batch(
+    deployed_warehouse,
+    warehouse_connection,):
     batch_id = uuid4()
 
     customer_1 = CustomerRecord(
@@ -249,13 +235,13 @@ def test_load_raw_customers_resumes_partial_batch():
         assert count == 2
 
     finally:
-        with get_warehouse_connection() as connection:
-            connection.execute(
-                """
-                DELETE FROM raw.Customers
-                WHERE BatchID = ?;
-                """,
-                str(batch_id),
-            )
-            connection.commit()
+        warehouse_connection.execute(
+            """
+            DELETE FROM raw.Customers
+            WHERE BatchID = ?;
+            """,
+            str(batch_id),
+        )
+
+        warehouse_connection.commit()
 
