@@ -128,7 +128,13 @@ jobs:
 
                   time.sleep(2)
           PY
-       
+
+      - name: Show repository contents
+        run: |
+          pwd
+          ls -la
+          find . -maxdepth 2 -type f | sort
+
       - name: Run integration tests
         run: |
           python -m pytest integration_tests -v
