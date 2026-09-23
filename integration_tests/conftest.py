@@ -28,7 +28,7 @@ def get_master_connection():
 
     username = "sa"  #os.environ[        "NORTHSTAR_SQL_USERNAME"    ]
 
-    password = os.environ[        "NORTHSTAR_INTEGRATION_PIPELINE_PASSWORD"    ]
+    password = os.environ[        "NORTHSTAR_INTEGRATION_SQL_PASSWORD"    ]
 
     connection_string = (
         f"DRIVER={{{driver}}};"
