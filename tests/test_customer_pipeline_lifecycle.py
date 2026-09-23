@@ -10,7 +10,7 @@ SRC_PATH = Path(__file__).resolve().parents[1] / "src"
 if str(SRC_PATH) not in sys.path:
     sys.path.insert(0, str(SRC_PATH))
 
-from customer_pipeline import run_customer_pipeline
+from customer_pipeline import run_customer_pipeline, BronzeStageResult, SilverStageResult
 
 @contextmanager
 def fake_pipeline_stage(*args, **kwargs):
@@ -134,3 +134,72 @@ def test_rejected_batch_does_not_overwrite_batch_status(
 
     mock_complete_pipeline.assert_called_once()
 
+@patch("customer_pipeline.complete_pipeline_run")
+@patch("customer_pipeline.complete_batch")
+@patch("customer_pipeline.run_customer_silver")
+@patch("customer_pipeline.run_customer_bronze")
+@patch("customer_pipeline.begin_or_retry_batch")
+@patch("customer_pipeline.start_pipeline_run")
+def test_supplied_batch_id_is_reused(
+    mock_start_pipeline_run,
+    mock_begin_or_retry_batch,
+    mock_run_customer_bronze,
+    mock_run_customer_silver,
+    mock_complete_batch,
+    mock_complete_pipeline_run,
+):
+    batch_id = uuid4()
+
+    mock_run_customer_bronze.return_value = (
+        BronzeStageResult(
+            rows_processed=2,
+            stages=[],
+        )
+    )
+
+    mock_run_customer_silver.return_value = (
+        SilverStageResult(
+            rows_inserted=2,
+            rows_updated=0,
+        )
+    )
+
+    result = run_customer_pipeline(
+        batch_id=batch_id,
+    )
+
+    assert result.batch_id == batch_id
+    assert result.pipeline_run_id != result.batch_id
+
+@patch("customer_pipeline.complete_pipeline_run")
+@patch("customer_pipeline.complete_batch")
+@patch("customer_pipeline.run_customer_silver")
+@patch("customer_pipeline.run_customer_bronze")
+@patch("customer_pipeline.begin_or_retry_batch")
+@patch("customer_pipeline.start_pipeline_run")
+def test_pipeline_generates_batch_id_when_not_supplied(
+    mock_start_pipeline_run,
+    mock_begin_or_retry_batch,
+    mock_run_customer_bronze,
+    mock_run_customer_silver,
+    mock_complete_batch,
+    mock_complete_pipeline_run,
+):
+    mock_run_customer_bronze.return_value = (
+        BronzeStageResult(
+            rows_processed=2,
+            stages=[],
+        )
+    )
+
+    mock_run_customer_silver.return_value = (
+        SilverStageResult(
+            rows_inserted=2,
+            rows_updated=0,
+        )
+    )
+
+    result = run_customer_pipeline()
+
+    assert result.batch_id is not None
+    assert result.pipeline_run_id != result.batch_id
