@@ -43,15 +43,6 @@ jobs:
           MSSQL_SA_PASSWORD: "NorthstarIntegration!2026_Test"
         ports:
           - 1433:1433
-        options: >-
-          -S localhost
-          -U sa
-          -P 'NorthstarIntegration!2026_Test'
-          -C
-          -Q 'SELECT 1'"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 10
 
     env:
       NORTHSTAR_SQL_SERVER: localhost,1433
