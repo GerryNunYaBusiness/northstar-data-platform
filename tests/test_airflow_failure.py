@@ -3,7 +3,6 @@ from datetime import datetime, timezone
 import sys
 from unittest.mock import Mock,patch
 from uuid import uuid4
-from unittest.mock import patch
 
 SRC_PATH = Path(__file__).resolve().parents[1] / "src"
 DAGS_PATH = Path(__file__).resolve().parents[1] / "dags"
@@ -23,12 +22,8 @@ def test_handle_pipeline_failure_marks_failed_and_sends_alert():
     mock_sink = Mock()
 
     with (
-        patch(
-            "monitoring.failure_handler.complete_batch"
-        ) as mock_complete_batch,
-        patch(
-            "monitoring.failure_handler.complete_pipeline_run"
-        ) as mock_complete_pipeline_run,
+        patch("monitoring.failure_handler.complete_batch") as mock_complete_batch,
+        patch("monitoring.failure_handler.complete_pipeline_run") as mock_complete_pipeline_run,
     ):
         handle_pipeline_failure(
             pipeline_name="customer_pipeline",
