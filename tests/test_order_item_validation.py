@@ -11,8 +11,6 @@ from ingestion.order_items import (
     OrderItemRecord,
     calculate_order_item_hash,
 )
-
-from ingestion.order_items import OrderItemRecord
 from validation.order_items import validate_order_item_fields
 
 

@@ -18,7 +18,7 @@ from transformation.orders import load_silver_orders
 
 
 def test_quarantined_order_is_promoted_after_customer_becomes_available(
-    deployed_warehouse,
+    # deployed_warehouse,
     warehouse_connection,
 ):
     customer_id = 950001
@@ -298,7 +298,9 @@ def test_quarantined_order_is_promoted_after_customer_becomes_available(
 
         warehouse_connection.commit()
 
-def test_invalid_order_record_is_quarantined(deployed_warehouse, warehouse_connection):
+def test_invalid_order_record_is_quarantined(
+        # deployed_warehouse,
+        warehouse_connection):
     order_id = 950002
     customer_id = 950002
 

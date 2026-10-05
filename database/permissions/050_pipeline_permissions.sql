@@ -35,3 +35,9 @@ GRANT SELECT, INSERT, DELETE ON OBJECT::raw.OrderItemBatchStage TO northstar_pip
 GRANT SELECT, INSERT, DELETE ON OBJECT::ops.OrderItemQuarantine TO northstar_pipeline;
 GRANT EXECUTE ON OBJECT::raw.usp_LoadOrderItemsForBatch TO northstar_pipeline;
 GRANT	EXECUTE	ON	silver.usp_LoadOrderItems	TO northstar_pipeline;
+
+GRANT SELECT, INSERT, DELETE ON OBJECT::raw.Payments TO northstar_pipeline;
+GRANT SELECT, INSERT, DELETE ON OBJECT::raw.PaymentBatchStage TO northstar_pipeline;
+GRANT EXECUTE ON OBJECT::raw.usp_LoadPaymentsForBatch TO northstar_pipeline;
+GRANT SELECT, INSERT, DELETE ON OBJECT::ops.PaymentQuarantine TO northstar_pipeline;
+GRANT	EXECUTE	ON	silver.usp_LoadPayments	TO northstar_pipeline;
