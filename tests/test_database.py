@@ -12,7 +12,7 @@ if str(SRC_PATH) not in sys.path:
     sys.path.insert(0, str(SRC_PATH))
 
 
-from database import _connect_with_retry
+from database import _connect_with_retry, get_deployment_connection,get_warehouse_connection
 
 
 def test_connection_succeeds_first_attempt():
@@ -89,3 +89,26 @@ def test_connection_preserves_original_operational_error():
         exc_info.value.__cause__,
         pyodbc.OperationalError,
     )
+
+
+def test_get_warehouse_connection_returns_valid_connection():
+    fake_connection = object()
+    with patch(
+        "database.pyodbc.connect",
+        return_value=fake_connection,
+    ) as mock_connect:
+        connection = get_warehouse_connection()
+
+    assert connection is fake_connection
+    assert mock_connect.call_count == 1
+    
+def test_get_deployment_connection_returns_valid_connection():
+    fake_connection = object()
+    with patch(
+        "database.pyodbc.connect",
+        return_value=fake_connection,
+    ) as mock_connect:
+        connection = get_deployment_connection()
+
+    assert connection is fake_connection
+    assert mock_connect.call_count == 1

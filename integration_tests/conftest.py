@@ -64,7 +64,6 @@ def drop_database(
         """
     )
 
-
 def create_database(
     connection,
     database_name: str,
@@ -131,14 +130,18 @@ def integration_databases():
 
 @pytest.fixture(scope="session")
 def warehouse_connection(
-    integration_databases,
+    # integration_databases,
+    deployed_warehouse,
 ):
-    database_name = (
-        integration_databases["warehouse"]
-    )
+    # database_name = (
+    #     integration_databases["warehouse"]
+    # )
 
+    # connection = get_admin_database_connection(
+    #     database_name
+    # )
     connection = get_admin_database_connection(
-        database_name
+        deployed_warehouse
     )
 
     yield connection
@@ -203,7 +206,7 @@ def get_pipeline_database_connection(
 
     server = os.environ[        "NORTHSTAR_SQL_SERVER"    ]
 
-    password = os.environ[        "NORTHSTAR_SQL_PASSWORD"    ]
+    password = os.environ[        "NORTHSTAR_INTEGRATION_PIPELINE_PASSWORD"    ]
 
     connection_string = (
         f"DRIVER={{{driver}}};"
@@ -289,7 +292,7 @@ def source_database(integration_databases):
 @pytest.fixture(scope="session")
 def deployed_warehouse(
     integration_databases,
-    warehouse_connection,
+    # warehouse_connection,
 ):
     project_root = (
         Path(__file__).resolve().parents[1]
@@ -299,12 +302,29 @@ def deployed_warehouse(
         project_root / "database"
     )
 
-    deploy_database(
-        warehouse_connection,
-        database_directory,
+    database_name = (
+        integration_databases["warehouse"]
+    )
+    deployment_connection = get_admin_database_connection(
+        database_name
     )
 
-    return integration_databases["warehouse"]
+    # print("calling DEPLOY_DATABASE ")
+    # deploy_database(
+    #     warehouse_connection,
+    #     database_directory,
+    # )
+
+    try:
+        deploy_database(
+            deployment_connection,
+            database_directory,
+        )
+
+        yield database_name
+
+    finally:
+        deployment_connection.close()
 
 def test_database_deployment_creates_core_objects(
     deployed_warehouse,

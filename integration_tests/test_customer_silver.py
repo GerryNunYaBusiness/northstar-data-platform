@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
+from uuid import uuid4
 from pathlib import Path
 import sys
-from uuid import uuid4
 
 
 SRC_PATH = (
