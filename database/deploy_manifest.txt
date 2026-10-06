@@ -38,6 +38,10 @@ indexes/037_raw_order_item_batch_stage.sql
 indexes/038_raw_payments.sql
 indexes/039_raw payment_batch_stage.sql
 
+views/040_pipeline_metrics.sql
+views/041_customer_pipeline_health.sql
+views/042_latest_customer.sql
+
 procedures/030_raw_load_customers_for_batch.sql
 procedures/031_silver_load_customers.sql
 procedures/042_raw_load_products_for_batch.sql
@@ -49,9 +53,6 @@ procedures/047_silver_load_order_items.sql
 procedures/048_raw_load_payments_for_batch.sql
 procedures/049_silver_load_payments.sql
 
-views/040_pipeline_metrics.sql
-views/041_customer_pipeline_health.sql
-views/042_latest_customer.sql
 
 permissions/049_pipeline_user.sql
 permissions/050_pipeline_permissions.sql

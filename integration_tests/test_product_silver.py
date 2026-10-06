@@ -68,7 +68,10 @@ def test_silver_insert_no_change_and_update(
         # Step 2:
         # First Silver load should INSERT the product.
         # ---------------------------------------------------------
-        first_result = load_silver_products()
+        first_result = load_silver_products(
+            pipeline_run_id=first_pipeline_run_id,
+            batch_id=first_batch_id,
+        )
 
         assert first_result.rows_inserted >= 1
 
@@ -100,7 +103,10 @@ def test_silver_insert_no_change_and_update(
         # perform no INSERT or UPDATE.
         # ---------------------------------------------------------
 
-        second_result = load_silver_products()
+        second_result = load_silver_products(
+            pipeline_run_id=first_pipeline_run_id,
+            batch_id=uuid4(),
+        )
 
         assert second_result.rows_inserted == 0
         assert second_result.rows_updated == 0
@@ -115,11 +121,13 @@ def test_silver_insert_no_change_and_update(
             product_id=TEST_PRODUCT_ID,
             unit_price="17.50"
         )
-
+        second_batch_id = uuid4()
+        second_pipeline_run_id = uuid4()
+        
         changed_bronze_rows = load_raw_products(
             [changed_product],
-            uuid4(),
-            uuid4(),
+            second_pipeline_run_id,
+            second_batch_id,
         )
 
         assert changed_bronze_rows == 1
@@ -130,7 +138,10 @@ def test_silver_insert_no_change_and_update(
         # existing current-state customer.
         # ---------------------------------------------------------
 
-        third_result = load_silver_products()
+        third_result = load_silver_products(
+            pipeline_run_id=second_pipeline_run_id,
+            batch_id=second_batch_id,
+        )
 
         assert third_result.rows_updated >= 1
 

@@ -3,7 +3,7 @@ from uuid import UUID
 
 from database import get_warehouse_connection
 
-
+'''start_batch was replaced with begin_or_retry_batch, which handles both starting a new batch and retrying a failed batch. The start_batch function is no longer needed.'''
 def start_batch(
     batch_id: UUID,
     pipeline_name: str,

@@ -1,41 +1,45 @@
-CREATE OR ALTER PROCEDURE [silver].[usp_LoadCustomers]
+CREATE OR ALTER PROCEDURE silver.usp_LoadCustomers
+    @PipelineRunID UNIQUEIDENTIFIER,
+    @BatchID UNIQUEIDENTIFIER
 AS
 BEGIN
     SET NOCOUNT ON;
     SET XACT_ABORT ON;
 
-    DECLARE @ProcessedAt DATETIME2 = SYSUTCDATETIME();
     DECLARE @RowsInserted INT = 0;
     DECLARE @RowsUpdated INT = 0;
 
     BEGIN TRY
-
         BEGIN TRANSACTION;
 
-        /* Update existing customers whose source data changed */
+        /*
+            Update Customers that already exist in Silver
+            when their business state has changed.
 
-        UPDATE SC
+            BatchID scopes this transformation to the
+            specific logical source snapshot being processed.
+        */
+        UPDATE S
         SET
-            SC.FirstName = RC.FirstName,
-            SC.LastName = RC.LastName,
-            SC.Email = RC.Email,
-            SC.Phone = RC.Phone,
-            SC.CreatedAt = RC.CreatedAt,
-            SC.RecordHash = RC.RecordHash,
-            SC.SourceIngestedAt = RC.IngestedAt,
-            SC.ProcessedAt = @ProcessedAt
-        FROM silver.Customers SC
-        INNER JOIN raw.vw_LatestCustomers RC
-            ON RC.CustomerID = SC.CustomerID
-        WHERE
-            RC.RecordHash IS NOT NULL
-            AND SC.RecordHash <> RC.RecordHash;
+            S.FirstName = R.FirstName,
+            S.LastName = R.LastName,
+            S.Email = R.Email,
+            S.Phone = R.Phone,
+            S.RecordHash = R.RecordHash,
+            S.SourceIngestedAt = R.IngestedAt,
+            S.ProcessedAt = SYSUTCDATETIME()
+        FROM silver.Customers AS S
+        INNER JOIN raw.Customers AS R
+            ON R.CustomerID = S.CustomerID
+        WHERE R.BatchID = @BatchID
+          AND R.RecordHash <> S.RecordHash;
 
         SET @RowsUpdated = @@ROWCOUNT;
 
-
-        /* Insert customers that do not exist in Silver */
-
+        /*
+            Insert Customers from this batch that do not
+            currently exist in Silver.
+        */
         INSERT INTO silver.Customers
         (
             CustomerID,
@@ -43,30 +47,27 @@ BEGIN
             LastName,
             Email,
             Phone,
-            CreatedAt,
             RecordHash,
             SourceIngestedAt,
             ProcessedAt
         )
         SELECT
-            RC.CustomerID,
-            RC.FirstName,
-            RC.LastName,
-            RC.Email,
-            RC.Phone,
-            RC.CreatedAt,
-            RC.RecordHash,
-            RC.IngestedAt,
-            @ProcessedAt
-        FROM raw.vw_LatestCustomers RC
-        WHERE
-            RC.RecordHash IS NOT NULL
-            AND NOT EXISTS
-            (
-                SELECT 1
-                FROM silver.Customers SC
-                WHERE SC.CustomerID = RC.CustomerID
-            );
+            R.CustomerID,
+            R.FirstName,
+            R.LastName,
+            R.Email,
+            R.Phone,
+            R.RecordHash,
+            R.IngestedAt,
+            SYSUTCDATETIME()
+        FROM raw.Customers AS R
+        WHERE R.BatchID = @BatchID
+          AND NOT EXISTS
+          (
+              SELECT 1
+              FROM silver.Customers AS S
+              WHERE S.CustomerID = R.CustomerID
+          );
 
         SET @RowsInserted = @@ROWCOUNT;
 
@@ -78,11 +79,10 @@ BEGIN
 
     END TRY
     BEGIN CATCH
-
-        IF @@TRANCOUNT > 0
+        IF XACT_STATE() <> 0
             ROLLBACK TRANSACTION;
 
         THROW;
-
     END CATCH;
 END;
+GO

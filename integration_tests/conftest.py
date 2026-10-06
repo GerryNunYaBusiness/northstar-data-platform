@@ -20,6 +20,10 @@ from database_deployment import deploy_database
 SOURCE_TEST_DATABASE = "NorthstarCommerce_IntegrationTest"
 WAREHOUSE_TEST_DATABASE = "NorthstarWarehouse_IntegrationTest"
 
+os.environ["NORTHSTAR_SOURCE_DATABASE"] = (SOURCE_TEST_DATABASE)
+os.environ["NORTHSTAR_WAREHOUSE_DATABASE"] = (WAREHOUSE_TEST_DATABASE)
+os.environ["NORTHSTAR_SQL_SERVER"] = "localhost,14330"
+os.environ.setdefault("NORTHSTAR_SQL_DRIVER",    "ODBC Driver 17 for SQL Server",)
 
 def get_master_connection():
     driver = os.environ[        "NORTHSTAR_SQL_DRIVER"    ]
@@ -81,7 +85,7 @@ def integration_databases():
     connection = get_master_connection()
 
     password = os.environ[        "NORTHSTAR_SQL_PASSWORD"    ]
-
+    # print(f" Creating integration test databases: {SOURCE_TEST_DATABASE}, {WAREHOUSE_TEST_DATABASE}")
     create_pipeline_login(
         connection,
         password,
@@ -147,6 +151,20 @@ def warehouse_connection(
     yield connection
 
     connection.close()
+
+@pytest.fixture(scope="session")
+def source_connection(
+    synthetic_source,
+    integration_databases,
+):
+    connection = get_admin_database_connection(
+        integration_databases["source"]
+    )
+
+    try:
+        yield connection
+    finally:
+        connection.close()
 
 def create_pipeline_login(
     connection,
@@ -234,22 +252,22 @@ def source_database(integration_databases):
 
     cursor = connection.cursor()
 
-    cursor.execute(
-        """
-        CREATE TABLE dbo.Customers
-        (
-            CustomerID INT NOT NULL
-                CONSTRAINT PK_Customers
-                PRIMARY KEY,
+    # cursor.execute(
+    #     """
+    #     CREATE TABLE dbo.Customers
+    #     (
+    #         CustomerID INT NOT NULL
+    #             CONSTRAINT PK_Customers
+    #             PRIMARY KEY,
 
-            FirstName NVARCHAR(100) NOT NULL,
-            LastName NVARCHAR(100) NOT NULL,
-            Email NVARCHAR(255) NULL,
-            Phone NVARCHAR(50) NULL,
-            CreatedAt DATETIME2(3) NOT NULL
-        );
-        """
-    )
+    #         FirstName NVARCHAR(100) NOT NULL,
+    #         LastName NVARCHAR(100) NOT NULL,
+    #         Email NVARCHAR(255) NULL,
+    #         Phone NVARCHAR(50) NULL,
+    #         CreatedAt DATETIME2(3) NOT NULL
+    #     );
+    #     """
+    # )
     cursor.execute(
         """
         INSERT INTO dbo.Customers
@@ -386,3 +404,164 @@ def grant_source_permissions(
 
     connection.commit()
     connection.close()
+
+
+@pytest.fixture(scope="session")
+def synthetic_source(
+    integration_databases,
+):
+    database_name = integration_databases["source"]
+
+    connection = get_admin_database_connection(
+        database_name
+    )
+
+    try:
+        cursor = connection.cursor()
+
+        cursor.execute(
+            """
+            IF OBJECT_ID('dbo.Payments', 'U') IS NOT NULL
+                DROP TABLE dbo.Payments;
+
+            IF OBJECT_ID('dbo.OrderItems', 'U') IS NOT NULL
+                DROP TABLE dbo.OrderItems;
+
+            IF OBJECT_ID('dbo.Orders', 'U') IS NOT NULL
+                DROP TABLE dbo.Orders;
+
+            IF OBJECT_ID('dbo.Products', 'U') IS NOT NULL
+                DROP TABLE dbo.Products;
+
+            IF OBJECT_ID('dbo.Customers', 'U') IS NOT NULL
+                DROP TABLE dbo.Customers;
+            """
+        )
+
+        # Customers
+        cursor.execute(
+            """
+            CREATE TABLE dbo.Customers
+            (
+                CustomerID INT NOT NULL
+                    CONSTRAINT PK_TestCustomers PRIMARY KEY,
+
+                FirstName NVARCHAR(100) NOT NULL,
+                LastName NVARCHAR(100) NOT NULL,
+                Email NVARCHAR(255) NULL,
+                Phone NVARCHAR(50) NULL,
+                CreatedAt DATETIME2(7) NOT NULL
+            );
+            """
+        )
+
+        # Products
+        cursor.execute(
+            """
+            CREATE TABLE dbo.Products
+            (
+                ProductID INT NOT NULL
+                    CONSTRAINT PK_TestProducts PRIMARY KEY,
+
+                ProductName NVARCHAR(255) NOT NULL,
+                Category NVARCHAR(100) NOT NULL,
+                UnitCost DECIMAL(18,2) NOT NULL,
+                UnitPrice DECIMAL(18,2) NOT NULL
+            );
+            """
+        )
+
+        # Orders
+        cursor.execute(
+            """
+            CREATE TABLE dbo.Orders
+            (
+                OrderID INT NOT NULL
+                    CONSTRAINT PK_TestOrders PRIMARY KEY,
+
+                CustomerID INT NOT NULL,
+                OrderDate DATETIME2(7) NOT NULL,
+                [Status] NVARCHAR(50) NOT NULL,
+                TotalAmount DECIMAL(18,2) NOT NULL
+            );
+            """
+        )
+
+        # OrderItems
+        cursor.execute(
+            """
+            CREATE TABLE dbo.OrderItems
+            (
+                OrderItemID INT NOT NULL
+                    CONSTRAINT PK_TestOrderItems PRIMARY KEY,
+
+                OrderID INT NOT NULL,
+                ProductID INT NOT NULL,
+                Quantity INT NOT NULL,
+                UnitPrice DECIMAL(18,2) NOT NULL
+            );
+            """
+        )
+
+        # Payments
+        cursor.execute(
+            """
+            CREATE TABLE dbo.Payments
+            (
+                PaymentID INT NOT NULL
+                    CONSTRAINT PK_TestPayments PRIMARY KEY,
+
+                OrderID INT NOT NULL,
+                PaymentDate DATETIME2(7) NOT NULL,
+                PaymentMethod NVARCHAR(50) NOT NULL,
+                Amount DECIMAL(18,2) NOT NULL,
+                [Status] NVARCHAR(50) NOT NULL
+            );
+            """
+        )
+
+        # escaped_password = os.environ[        "NORTHSTAR_SQL_PASSWORD"    ].replace( "'", "''", )
+
+        # cursor.execute(
+        #     """
+        #     IF SUSER_ID('northstar_pipeline') IS NULL
+        #     BEGIN
+        #         CREATE LOGIN northstar_pipeline
+        #         WITH PASSWORD = '{escaped_password}';
+        #     END
+        #     ELSE
+        #     BEGIN
+        #         ALTER LOGIN northstar_pipeline
+        #         WITH PASSWORD = '{escaped_password}';
+        #     END;
+        #     """
+        # )
+        
+        # create_pipeline_login(
+        #     connection,
+        #     os.environ[        "NORTHSTAR_SQL_PASSWORD"    ],
+        # )
+        # connection.commit()
+
+        # Permissions for northstar_pipeline user
+        cursor.execute(
+            """
+            IF DATABASE_PRINCIPAL_ID('northstar_pipeline') IS NULL
+            BEGIN
+                CREATE USER northstar_pipeline
+                FOR LOGIN northstar_pipeline;
+            END;            
+            GRANT SELECT ON dbo.Customers TO northstar_pipeline;
+            GRANT SELECT ON dbo.Products TO northstar_pipeline;
+            GRANT SELECT ON dbo.Orders TO northstar_pipeline;
+            GRANT SELECT ON dbo.OrderItems TO northstar_pipeline;
+            GRANT SELECT ON dbo.Payments TO northstar_pipeline;
+            """
+        )
+
+        connection.commit()
+
+        yield database_name
+
+    finally:
+        connection.close()

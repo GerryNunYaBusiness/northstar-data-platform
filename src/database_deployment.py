@@ -180,10 +180,10 @@ def deploy_database(
     try:
         # print("DEPLOY_DATABASE CALLED")
         for script_path in script_paths:
-            # print(
-            #     "Applying: "
-            #     f"{script_path.relative_to(database_directory)}"
-            # )
+            print(
+                "Applying: "
+                f"{script_path.relative_to(database_directory)}"
+            )
 
             execute_sql_script(
                 connection,

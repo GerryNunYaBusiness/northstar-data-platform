@@ -1,4 +1,6 @@
 CREATE OR ALTER PROCEDURE silver.usp_LoadProducts
+    @PipelineRunID UNIQUEIDENTIFIER,
+    @BatchID UNIQUEIDENTIFIER
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -10,61 +12,31 @@ BEGIN
     BEGIN TRY
         BEGIN TRANSACTION;
 
-        ;WITH LatestProducts AS
-        (
-            SELECT
-                P.ProductID,
-                P.ProductName,
-                P.Category,
-                P.UnitCost,
-                P.UnitPrice,
-                P.RecordHash,
-                P.IngestedAt,
-                ROW_NUMBER() OVER
-                (
-                    PARTITION BY P.ProductID
-                    ORDER BY
-                        P.IngestedAt DESC,
-                        P.PipelineRunID DESC
-                ) AS RowNumber
-            FROM raw.Products AS P
-        )
+        /*
+            Update Products that already exist in Silver
+            when their business state has changed.
+        */
         UPDATE S
         SET
-            S.ProductName = L.ProductName,
-            S.Category = L.Category,
-            S.UnitCost = L.UnitCost,
-            S.UnitPrice = L.UnitPrice,
-            S.RecordHash = L.RecordHash,
-            S.SourceIngestedAt = L.IngestedAt,
+            S.ProductName = R.ProductName,
+            S.Category = R.Category,
+            S.UnitCost = R.UnitCost,
+            S.UnitPrice = R.UnitPrice,
+            S.RecordHash = R.RecordHash,
+            S.SourceIngestedAt = R.IngestedAt,
             S.ProcessedAt = SYSUTCDATETIME()
         FROM silver.Products AS S
-        INNER JOIN LatestProducts AS L
-            ON L.ProductID = S.ProductID
-        WHERE L.RowNumber = 1
-          AND L.RecordHash <> S.RecordHash;
+        INNER JOIN raw.Products AS R
+            ON R.ProductID = S.ProductID
+        WHERE R.BatchID = @BatchID
+          AND R.RecordHash <> S.RecordHash;
 
         SET @RowsUpdated = @@ROWCOUNT;
 
-        ;WITH LatestProducts AS
-        (
-            SELECT
-                P.ProductID,
-                P.ProductName,
-                P.Category,
-                P.UnitCost,
-                P.UnitPrice,
-                P.RecordHash,
-                P.IngestedAt,
-                ROW_NUMBER() OVER
-                (
-                    PARTITION BY P.ProductID
-                    ORDER BY
-                        P.IngestedAt DESC,
-                        P.PipelineRunID DESC
-                ) AS RowNumber
-            FROM raw.Products AS P
-        )
+        /*
+            Insert Products from this batch that do not
+            currently exist in Silver.
+        */
         INSERT INTO silver.Products
         (
             ProductID,
@@ -73,23 +45,25 @@ BEGIN
             UnitCost,
             UnitPrice,
             RecordHash,
-            SourceIngestedAt
+            SourceIngestedAt,
+            ProcessedAt
         )
         SELECT
-            L.ProductID,
-            L.ProductName,
-            L.Category,
-            L.UnitCost,
-            L.UnitPrice,
-            L.RecordHash,
-            L.IngestedAt
-        FROM LatestProducts AS L
-        WHERE L.RowNumber = 1
+            R.ProductID,
+            R.ProductName,
+            R.Category,
+            R.UnitCost,
+            R.UnitPrice,
+            R.RecordHash,
+            R.IngestedAt,
+            SYSUTCDATETIME()
+        FROM raw.Products AS R
+        WHERE R.BatchID = @BatchID
           AND NOT EXISTS
           (
               SELECT 1
               FROM silver.Products AS S
-              WHERE S.ProductID = L.ProductID
+              WHERE S.ProductID = R.ProductID
           );
 
         SET @RowsInserted = @@ROWCOUNT;
@@ -99,6 +73,7 @@ BEGIN
         SELECT
             @RowsInserted AS RowsInserted,
             @RowsUpdated AS RowsUpdated;
+
     END TRY
     BEGIN CATCH
         IF XACT_STATE() <> 0

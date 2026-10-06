@@ -1,6 +1,5 @@
-CREATE OR ALTER view [raw].[vw_LatestCustomers]
+CREATE OR ALTER VIEW raw.vw_LatestCustomers
 AS
-
 WITH RankedCustomers AS
 (
     SELECT
@@ -12,13 +11,16 @@ WITH RankedCustomers AS
         RC.CreatedAt,
         RC.IngestedAt,
         RC.PipelineRunID,
-		RC.RecordHash,
+        RC.BatchID,
+        RC.RecordHash,
         ROW_NUMBER() OVER
         (
             PARTITION BY RC.CustomerID
-            ORDER BY RC.IngestedAt DESC
+            ORDER BY
+                RC.IngestedAt DESC,
+                RC.BatchID DESC
         ) AS RowNum
-    FROM raw.Customers RC
+    FROM raw.Customers AS RC
 )
 SELECT
     CustomerID,
@@ -29,7 +31,8 @@ SELECT
     CreatedAt,
     IngestedAt,
     PipelineRunID,
-	RecordHash
+    BatchID,
+    RecordHash
 FROM RankedCustomers
 WHERE RowNum = 1;
 GO
