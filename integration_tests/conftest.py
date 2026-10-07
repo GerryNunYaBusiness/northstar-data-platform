@@ -22,7 +22,7 @@ WAREHOUSE_TEST_DATABASE = "NorthstarWarehouse_IntegrationTest"
 
 os.environ["NORTHSTAR_SOURCE_DATABASE"] = (SOURCE_TEST_DATABASE)
 os.environ["NORTHSTAR_WAREHOUSE_DATABASE"] = (WAREHOUSE_TEST_DATABASE)
-os.environ["NORTHSTAR_SQL_SERVER"] = "localhost,14330"
+os.environ.setdefault("NORTHSTAR_SQL_SERVER", "localhost,14330",)
 os.environ.setdefault("NORTHSTAR_SQL_DRIVER",    "ODBC Driver 17 for SQL Server",)
 
 def get_master_connection():
