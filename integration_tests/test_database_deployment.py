@@ -9,6 +9,7 @@ if str(SRC_PATH) not in sys.path:
 
 
 from database_deployment import deploy_database
+from database import get_warehouse_connection, get_deployment_connection
 
 def test_database_deployment_creates_core_objects(
     warehouse_connection,

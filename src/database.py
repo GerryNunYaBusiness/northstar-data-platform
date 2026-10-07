@@ -86,3 +86,29 @@ def get_warehouse_connection() -> pyodbc.Connection:
     return _connect_with_retry(
         _build_connection_string(database)
     )
+
+def get_deployment_connection():
+    driver = os.getenv(
+        "NORTHSTAR_SQL_DRIVER",
+        "ODBC Driver 17 for SQL Server",
+    )
+
+    server = os.getenv(
+        "NORTHSTAR_SQL_SERVER",
+        "localhost",
+    )
+
+    database = os.getenv(
+        "NORTHSTAR_WAREHOUSE_DATABASE",
+        "NorthstarWarehouse",
+    )
+
+    connection_string = (
+        f"DRIVER={{{driver}}};"
+        f"SERVER={server};"
+        f"DATABASE={database};"
+        "Trusted_Connection=yes;"
+        "TrustServerCertificate=yes;"
+    )
+
+    return _connect_with_retry(connection_string)

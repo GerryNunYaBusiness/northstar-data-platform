@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
+from uuid import uuid4
 from pathlib import Path
 import sys
-from uuid import uuid4
 
 
 SRC_PATH = (
@@ -18,7 +18,7 @@ from ingestion.customers import (
     load_raw_customers,
 )
 from transformation.customers import (    load_silver_customers,)
-from integration_tests.conftest import deployed_warehouse, warehouse_connection
+from integration_tests.conftest import  warehouse_connection
 
 
 TEST_CUSTOMER_ID = 910001
@@ -38,7 +38,7 @@ def make_customer(
 
 
 def test_silver_insert_no_change_and_update(
-    deployed_warehouse,
+    # deployed_warehouse,
     warehouse_connection,
 ):
     # ---------------------------------------------------------
@@ -66,9 +66,12 @@ def test_silver_insert_no_change_and_update(
     # First Silver load should INSERT the customer.
     # ---------------------------------------------------------
 
-    first_result = load_silver_customers()
+    first_result = load_silver_customers(
+        pipeline_run_id=first_pipeline_run_id,
+        batch_id=first_batch_id,
+    )
 
-    assert first_result.inserted >= 1
+    assert first_result.rows_inserted >= 1
 
     cursor = warehouse_connection.cursor()
 
@@ -101,10 +104,13 @@ def test_silver_insert_no_change_and_update(
     # perform no INSERT or UPDATE.
     # ---------------------------------------------------------
 
-    second_result = load_silver_customers()
+    second_result = load_silver_customers(
+        pipeline_run_id=first_pipeline_run_id,
+        batch_id=uuid4(),
+    )
 
-    assert second_result.inserted == 0
-    assert second_result.updated == 0
+    assert second_result.rows_inserted == 0
+    assert second_result.rows_updated == 0
 
     # ---------------------------------------------------------
     # Step 4:
@@ -133,10 +139,13 @@ def test_silver_insert_no_change_and_update(
     # existing current-state customer.
     # ---------------------------------------------------------
 
-    third_result = load_silver_customers()
+    third_result = load_silver_customers(
+        pipeline_run_id=second_pipeline_run_id,
+        batch_id=second_batch_id,
+    )
 
-    assert third_result.inserted == 0
-    assert third_result.updated >= 1
+    assert third_result.rows_inserted == 0
+    assert third_result.rows_updated >= 1
 
     # ---------------------------------------------------------
     # Step 6:

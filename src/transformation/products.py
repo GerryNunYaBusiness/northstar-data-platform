@@ -4,37 +4,34 @@ from uuid import UUID
 from database import get_warehouse_connection
 
 
-@dataclass
-class SilverLoadResult:
+@dataclass(frozen=True)
+class ProductTransformationResult:
     rows_inserted: int
     rows_updated: int
 
 
-def load_silver_customers(
+def load_silver_products(
     pipeline_run_id: UUID,
     batch_id: UUID,
-) -> SilverLoadResult:
+) -> ProductTransformationResult:
     with get_warehouse_connection() as connection:
         cursor = connection.cursor()
 
         cursor.execute(
             """
-            EXEC silver.usp_LoadCustomers
+            EXEC silver.usp_LoadProducts
                 @PipelineRunID = ?,
                 @BatchID = ?;
             """,
             pipeline_run_id,
             batch_id,
         )
+
         row = cursor.fetchone()
+
         connection.commit()
 
-        if row is None:
-            raise RuntimeError(
-                "Silver customer load returned no result."
-            )
-
-        return SilverLoadResult(
+        return ProductTransformationResult(
             rows_inserted=row.RowsInserted,
             rows_updated=row.RowsUpdated,
         )

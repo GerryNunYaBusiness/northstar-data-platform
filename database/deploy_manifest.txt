@@ -9,18 +9,50 @@ tables/014_raw_customers.sql
 tables/015_raw_customer_batch_stage.sql
 tables/016_silver_customers.sql
 tables/017_ops_pipeline_events.sql
+tables/022_raw_products.sql
+tables/023_raw_product_batch_stage.sql
+tables/024_silver_products.sql
+tables/025_raw_orders.sql
+tables/026_raw_order_batch_stage.sql
+tables/027_ops_order_quarantine.sql
+tables/028_silver_orders.sql
+tables/029_raw_order_items.sql
+tables/030_raw_order_item_batch_stage.sql
+tables/031_ops_order_item_quarantine.sql
+tables/032_silver_order_items.sql
+tables/033_raw_payments.sql
+tables/034_raw_payment_batch_stage.sql
+tables/035_ops_payment_quarantine.sql
+tables/036_silver_payments.sql
 
 indexes/020_raw_customers.sql
 indexes/021_raw_customer_batch_stage.sql
 indexes/022_silver_customers.sql
 indexes/023_ops_pipeline_events.sql
-
-procedures/030_raw_load_customers_for_batch.sql
-procedures/031_silver_load_customers.sql
+indexes/032_raw_products.sql
+indexes/033_raw_product_batch_stage.sql
+indexes/034_raw_orders.sql
+indexes/035_raw_order_batch_stage.sql
+indexes/036_raw_order_items.sql
+indexes/037_raw_order_item_batch_stage.sql
+indexes/038_raw_payments.sql
+indexes/039_raw payment_batch_stage.sql
 
 views/040_pipeline_metrics.sql
 views/041_customer_pipeline_health.sql
 views/042_latest_customer.sql
+
+procedures/030_raw_load_customers_for_batch.sql
+procedures/031_silver_load_customers.sql
+procedures/042_raw_load_products_for_batch.sql
+procedures/043_silver_load_products.sql
+procedures/044_raw_load_orders_for_batch.sql
+procedures/045_silver_load_orders.sql
+procedures/046_raw_load_order_items_for_batch.sql
+procedures/047_silver_load_order_items.sql
+procedures/048_raw_load_payments_for_batch.sql
+procedures/049_silver_load_payments.sql
+
 
 permissions/049_pipeline_user.sql
 permissions/050_pipeline_permissions.sql

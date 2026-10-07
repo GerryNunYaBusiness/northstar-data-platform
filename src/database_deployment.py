@@ -127,6 +127,7 @@ def read_manifest(
     manifest_path: Path,
     base_directory: Path,
 ) -> list[Path]:
+    # print("DEPLOYMENT MANIFEST:", manifest_path)
     lines = manifest_path.read_text(
         encoding="utf-8"
     ).splitlines()
@@ -177,6 +178,7 @@ def deploy_database(
     )
 
     try:
+        # print("DEPLOY_DATABASE CALLED")
         for script_path in script_paths:
             print(
                 "Applying: "
@@ -203,7 +205,7 @@ def deploy_database(
 #This is runable as a script for DB object deployment.
 if __name__ == "__main__":
     from database import (
-        get_warehouse_connection,
+        get_deployment_connection,
     )
 
     project_root = (
@@ -214,7 +216,7 @@ if __name__ == "__main__":
         project_root / "database"
     )
 
-    connection = get_warehouse_connection()
+    connection = get_deployment_connection()
 
     try:
         deploy_database(

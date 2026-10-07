@@ -121,134 +121,10 @@ def run_customer_pipeline(
         bronze_result = run_customer_bronze(
             context,
         )
-        ''' Moved code to run_customer_bronze function '''
-        # with pipeline_stage(
-        #     context.pipeline_run_id,
-        #     "extract_customers",
-        # ) as stage:
-
-        #     customers = extract_customers()
-        #     stage["rows_processed"] = len(customers)
-
-        # stages.append(
-        #     StageResult(
-        #         name="extract_customers",
-        #         status="SUCCESS",
-        #         rows_processed=len(customers),
-        #     )
-        # )
-
-        # with pipeline_stage(
-        #     pipeline_run_id,
-        #     "validate_customers",
-        # ) as stage:
-
-        #     validation_errors = validate_customers(customers)
-
-        #     valid_customers = get_valid_customers(
-        #         customers,
-        #         validation_errors,
-        #     )
-
-        #     total_count = len(customers)
-
-        #     invalid_count = len(
-        #         {
-        #             error.customer.customer_id
-        #             for error in validation_errors
-        #         }
-        #     )
-
-        #     invalid_rate = (
-        #         invalid_count / total_count
-        #         if total_count
-        #         else 0
-        #     )
-
-        #     stage["rows_processed"] = total_count
-
-        # stages.append(
-        #     StageResult(
-        #         name="validate_customers",
-        #         status="SUCCESS",
-        #         rows_processed=len(customers),
-        #     )
-        # )
-
-        # with pipeline_stage(
-        #     context.pipeline_run_id,
-        #     "quarantine_invalid_customers",
-        # ) as stage:
-
-        #     quarantined_rows = quarantine_customer_errors(
-        #         validation_errors,
-        #         context.pipeline_run_id,
-        #     )
-
-        #     stage["rows_processed"] = quarantined_rows
-
-        # if invalid_rate > invalid_rate_threshold:
-        #     raise ValueError(
-        #         "Customer validation failure rate "
-        #         f"{invalid_rate:.2%} exceeds configured threshold "
-        #         f"{invalid_rate_threshold:.2%}"
-        #     )
-
-        # with pipeline_stage(
-        #     context.pipeline_run_id,
-        #     "load_bronze_customers",
-        # ) as stage:
-        #     if raw_customer_batch_exists(
-        #         get_warehouse_connection(),
-        #         context.batch_id,
-        #     ):
-        #         bronze_rows = 0
-        #     else:
-        #         bronze_rows = load_raw_customers(
-        #             valid_customers,
-        #             context.pipeline_run_id,
-        #             context.batch_id,
-        #     )
-
-        #     stage["rows_processed"] = bronze_rows
-
-        # stages.append(
-        #     StageResult(
-        #         name="load_bronze_customers",
-        #         status="SUCCESS",
-        #         rows_processed=bronze_rows,
-        #     )
-        # )
 
         silver_result = run_customer_silver(
             context,
         )
-        ''' Moved silver customer loading to run_customer_silver function '''
-        # with pipeline_stage(
-        #     context.pipeline_run_id,
-        #     "load_silver_customers",
-        # ) as stage:
-
-        #     silver_result = load_silver_customers()
-
-        #     silver_rows = (
-        #         silver_result.inserted
-        #         + silver_result.updated
-        #     )
-
-        #     stage["rows_processed"] = silver_rows
-
-        # stages.append(
-        #     StageResult(
-        #         name="load_silver_customers",
-        #         status="SUCCESS",
-        #         rows_processed=silver_rows,
-        #         message=(
-        #             f"inserted={silver_result.inserted} "
-        #             f"updated={silver_result.updated}"
-        #         ),
-        #     )
-        # )
 
         complete_batch(
             batch_id=context.batch_id,
@@ -297,7 +173,7 @@ def run_customer_bronze(
     # )
     with pipeline_stage(
         context.pipeline_run_id,
-        "bronze",
+        "customer_bronze",
     ) as stage:
         if get_test_failure_stage() == "bronze":
             raise InjectedPipelineFailure(
@@ -376,7 +252,7 @@ def run_customer_silver(
 ) -> SilverStageResult:
     with pipeline_stage(
         context.pipeline_run_id,
-        "load_silver_customers",
+        "customer_silver",
     ) as stage:
         if get_test_failure_stage() == "silver":
             raise InjectedPipelineFailure(
@@ -384,14 +260,17 @@ def run_customer_silver(
                 "NORTHSTAR_TEST_FAILURE_STAGE."
             )
         
-        result = load_silver_customers()
+        result = load_silver_customers(
+            context.pipeline_run_id,
+            context.batch_id,
+        )
 
         stage["rows_processed"] = (
-            result.inserted
-            + result.updated
+            result.rows_inserted
+            + result.rows_updated
         )
 
     return SilverStageResult(
-        rows_inserted=result.inserted,
-        rows_updated=result.updated,
+        rows_inserted=result.rows_inserted,
+        rows_updated=result.rows_updated,
     )

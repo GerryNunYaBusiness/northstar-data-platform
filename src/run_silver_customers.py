@@ -1,5 +1,6 @@
 import logging
 import sys
+from uuid import uuid4
 
 from transformation.customers import load_silver_customers
 
@@ -21,13 +22,16 @@ def main() -> int:
     logger.info("Starting Silver customer load")
 
     try:
-        result = load_silver_customers()
+        result = load_silver_customers(
+            pipeline_run_id= uuid4(),
+            batch_id= uuid4(),
+        )
 
         logger.info(
             "Silver customer load completed "
             "inserted=%s updated=%s",
-            result.inserted,
-            result.updated,
+            result.rows_inserted,
+            result.rows_updated,
         )
 
         return 0

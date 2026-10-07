@@ -1,4 +1,4 @@
-CREATE OR ALTER PROCEDURE silver.usp_LoadCustomers
+CREATE OR ALTER PROCEDURE silver.usp_LoadProducts
     @PipelineRunID UNIQUEIDENTIFIER,
     @BatchID UNIQUEIDENTIFIER
 AS
@@ -13,60 +13,57 @@ BEGIN
         BEGIN TRANSACTION;
 
         /*
-            Update Customers that already exist in Silver
+            Update Products that already exist in Silver
             when their business state has changed.
-
-            BatchID scopes this transformation to the
-            specific logical source snapshot being processed.
         */
         UPDATE S
         SET
-            S.FirstName = R.FirstName,
-            S.LastName = R.LastName,
-            S.Email = R.Email,
-            S.Phone = R.Phone,
+            S.ProductName = R.ProductName,
+            S.Category = R.Category,
+            S.UnitCost = R.UnitCost,
+            S.UnitPrice = R.UnitPrice,
             S.RecordHash = R.RecordHash,
             S.SourceIngestedAt = R.IngestedAt,
             S.ProcessedAt = SYSUTCDATETIME()
-        FROM silver.Customers AS S
-        INNER JOIN raw.Customers AS R
-            ON R.CustomerID = S.CustomerID
+        FROM silver.Products AS S
+        INNER JOIN raw.Products AS R
+            ON R.ProductID = S.ProductID
         WHERE R.BatchID = @BatchID
           AND R.RecordHash <> S.RecordHash;
 
         SET @RowsUpdated = @@ROWCOUNT;
 
         /*
-            Insert Customers from this batch that do not
+            Insert Products from this batch that do not
             currently exist in Silver.
         */
-        INSERT INTO silver.Customers
+        INSERT INTO silver.Products
         (
-            CustomerID,
-            FirstName,
-            LastName,
-            Email,
-            Phone,
+            ProductID,
+            ProductName,
+            Category,
+            UnitCost,
+            UnitPrice,
             RecordHash,
             SourceIngestedAt,
             ProcessedAt
         )
         SELECT
-            R.CustomerID,
-            R.FirstName,
-            R.LastName,
-            R.Email,
-            R.Phone,
+            R.ProductID,
+            R.ProductName,
+            R.Category,
+            R.UnitCost,
+            R.UnitPrice,
             R.RecordHash,
             R.IngestedAt,
             SYSUTCDATETIME()
-        FROM raw.Customers AS R
+        FROM raw.Products AS R
         WHERE R.BatchID = @BatchID
           AND NOT EXISTS
           (
               SELECT 1
-              FROM silver.Customers AS S
-              WHERE S.CustomerID = R.CustomerID
+              FROM silver.Products AS S
+              WHERE S.ProductID = R.ProductID
           );
 
         SET @RowsInserted = @@ROWCOUNT;
