@@ -2,23 +2,7 @@ from dataclasses import dataclass
 # from multiprocessing import context
 from uuid import UUID, uuid4
 
-
-@dataclass(frozen=True)
-class CommerceStageResult:
-    stage_name: str
-    rows_inserted: int = 0
-    rows_updated: int = 0
-    rows_quarantined: int = 0
-
-
-@dataclass(frozen=True)
-class CommercePipelineResult:
-    pipeline_run_id: UUID
-    batch_id: UUID
-    status: str
-    stages: list[CommerceStageResult]
-
-from pipeline_context import PipelineContext
+# from pipeline_context import PipelineContext
 
 from ingestion.customers import extract_customers, load_raw_customers
 from ingestion.products import extract_products, load_raw_products
@@ -34,14 +18,76 @@ from transformation.payments import load_silver_payments
 
 from monitoring.pipeline_runs import start_pipeline_run, complete_pipeline_run
 from monitoring.pipeline_batches import  begin_or_retry_batch, complete_batch
-from monitoring.pipeline_runs import pipeline_stage
+# from monitoring.pipeline_runs import pipeline_stage
+
+from pipeline_framework.context import PipelineContext
+from pipeline_framework.results import StageResult
+# from pipeline_framework.stages import execute_bronze_stage, execute_silver_stage
+from pipeline_framework.entity import EntityPipeline, execute_entity_pipeline
+
+# @dataclass(frozen=True)
+# class CommerceStageResult:
+#     stage_name: str
+#     rows_inserted: int = 0
+#     rows_updated: int = 0
+#     rows_quarantined: int = 0
+
+@dataclass(frozen=True)
+class CommercePipelineResult:
+    pipeline_run_id: UUID
+    batch_id: UUID
+    status: str
+    stages: list[StageResult]
+
+CUSTOMERS_PIPELINE = EntityPipeline(
+    name="customers",
+    extractor=extract_customers,
+    bronze_loader=load_raw_customers,
+    silver_loader=load_silver_customers,
+)
+
+PRODUCTS_PIPELINE = EntityPipeline(
+    name="products",
+    extractor=extract_products,
+    bronze_loader=load_raw_products,
+    silver_loader=load_silver_products,
+)
+
+ORDERS_PIPELINE = EntityPipeline(
+    name="orders",
+    extractor=extract_orders,
+    bronze_loader=load_raw_orders,
+    silver_loader=load_silver_orders,
+)
+
+ORDER_ITEMS_PIPELINE = EntityPipeline(
+    name="order_items",
+    extractor=extract_order_items,
+    bronze_loader=load_raw_order_items,
+    silver_loader=load_silver_order_items,
+)
+
+PAYMENTS_PIPELINE = EntityPipeline(
+    name="payments",
+    extractor=extract_payments,
+    bronze_loader=load_raw_payments,
+    silver_loader=load_silver_payments,
+)
+
+COMMERCE_PIPELINES = [
+    CUSTOMERS_PIPELINE,
+    PRODUCTS_PIPELINE,
+    ORDERS_PIPELINE,
+    ORDER_ITEMS_PIPELINE,
+    PAYMENTS_PIPELINE,
+]
 
 
 def run_commerce_pipeline(
     pipeline_run_id: UUID,
     batch_id: UUID,
 ) -> CommercePipelineResult:
-    stages: list[CommerceStageResult] = []
+    stages: list[StageResult] = []
 
     if batch_id is None:
         batch_id = uuid4()
@@ -60,212 +106,17 @@ def run_commerce_pipeline(
             pipeline_name,
         )
 
-        # begin_or_retry_batch(
-        #     batch_id=batch_id,
-        #     pipeline_name=pipeline_name,
-        # )
-        # ---------------------------------------------------------
-        # Customers
-        # ---------------------------------------------------------
-
-        with pipeline_stage(
-            pipeline_run_id,
-            "customers_bronze",
-        ):
-            customers = extract_customers()
-
-            customer_rows_inserted = load_raw_customers(
-                customers,
-                pipeline_run_id,
-                batch_id,
-            )
-
-            stages.append(
-                CommerceStageResult(
-                    stage_name="customers_bronze",
-                    rows_inserted=customer_rows_inserted,
+        for entity in COMMERCE_PIPELINES:
+            stages.extend(
+                execute_entity_pipeline(
+                    entity=entity,
+                    context=context,
                 )
             )
 
-        with pipeline_stage(
-            pipeline_run_id,
-            "customers_silver",
-        ):
-            customer_result = load_silver_customers(
-                pipeline_run_id,
-                batch_id,
-            )
-
-            stages.append(
-                CommerceStageResult(
-                    stage_name="customers_silver",
-                    rows_inserted=customer_result.rows_inserted,
-                    rows_updated=customer_result.rows_updated,
-                    rows_quarantined=getattr(
-                        customer_result,
-                        "rows_quarantined",
-                        0,
-                    ),
-                )
-            )
-
-        # ---------------------------------------------------------
-        # Products
-        # ---------------------------------------------------------
-        with pipeline_stage(
-            pipeline_run_id,
-            "products_bronze",
-        ):
-            products = extract_products()
-
-            product_rows_inserted = load_raw_products(
-                products,
-                pipeline_run_id,
-                batch_id,
-            )
-
-            stages.append(
-                CommerceStageResult(
-                    stage_name="products_bronze",
-                    rows_inserted=product_rows_inserted,
-                )
-            )
-
-        with pipeline_stage(
-            pipeline_run_id,
-            "products_silver",
-        ):
-            product_result = load_silver_products(
-                pipeline_run_id,
-                batch_id,
-            )
-
-            stages.append(
-                CommerceStageResult(
-                    stage_name="products_silver",
-                    rows_inserted=product_result.rows_inserted,
-                    rows_updated=product_result.rows_updated,
-                )
-            )
-
-        # ---------------------------------------------------------
-        # Orders
-        # ---------------------------------------------------------
-        with pipeline_stage(
-            pipeline_run_id,
-            "orders_bronze",
-        ):
-            orders = extract_orders()
-
-            order_rows_inserted = load_raw_orders(
-                orders,
-                pipeline_run_id,
-                batch_id,
-            )
-
-            stages.append(
-                CommerceStageResult(
-                    stage_name="orders_bronze",
-                    rows_inserted=order_rows_inserted,
-                )
-            )
-        with pipeline_stage(
-            pipeline_run_id,
-            "orders_silver",
-        ):
-            order_result = load_silver_orders(
-                pipeline_run_id,
-                batch_id,
-            )
-
-            stages.append(
-                CommerceStageResult(
-                    stage_name="orders_silver",
-                    rows_inserted=order_result.rows_inserted,
-                    rows_updated=order_result.rows_updated,
-                    rows_quarantined=order_result.rows_quarantined,
-                )
-            )
-
-        # ---------------------------------------------------------
-        # OrderItems
-        # ---------------------------------------------------------
-        with pipeline_stage(
-            pipeline_run_id,
-            "order_items_bronze",
-        ):
-            order_items = extract_order_items()
-
-            order_item_rows_inserted = load_raw_order_items(
-                order_items,
-                pipeline_run_id,
-                batch_id,
-            )
-
-            stages.append(
-                CommerceStageResult(
-                    stage_name="order_items_bronze",
-                    rows_inserted=order_item_rows_inserted,
-                )
-            )
-
-        with pipeline_stage(
-            pipeline_run_id,
-            "order_items_silver",
-        ):
-            order_item_result = load_silver_order_items(
-                pipeline_run_id,
-                batch_id,
-            )
-
-            stages.append(
-                CommerceStageResult(
-                    stage_name="order_items_silver",
-                    rows_inserted=order_item_result.rows_inserted,
-                    rows_updated=order_item_result.rows_updated,
-                    rows_quarantined=order_item_result.rows_quarantined,
-                )
-            )
-
-        # ---------------------------------------------------------
-        # Payments
-        # ---------------------------------------------------------
-        with pipeline_stage(
-            pipeline_run_id,
-            "payments_bronze",
-        ):
-            payments = extract_payments()
-
-            payment_rows_inserted = load_raw_payments(
-                payments,
-                pipeline_run_id,
-                batch_id,
-            )
-
-            stages.append(
-                CommerceStageResult(
-                    stage_name="payments_bronze",
-                    rows_inserted=payment_rows_inserted,
-                )
-            )
-
-        with pipeline_stage(
-            pipeline_run_id,
-            "payments_silver",
-        ):
-            payment_result = load_silver_payments(
-                pipeline_run_id,
-                batch_id,
-            )
-
-            stages.append(
-                CommerceStageResult(
-                    stage_name="payments_silver",
-                    rows_inserted=payment_result.rows_inserted,
-                    rows_updated=payment_result.rows_updated,
-                    rows_quarantined=payment_result.rows_quarantined,
-                )
-            )
+        #---------------------------------------------------------
+        # Process Completion
+        #---------------------------------------------------------
 
         complete_pipeline_run(
             pipeline_run_id = pipeline_run_id,
