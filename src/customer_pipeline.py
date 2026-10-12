@@ -101,6 +101,7 @@ def run_customer_pipeline(
     start_pipeline_run(
         pipeline_run_id=context.pipeline_run_id,
         pipeline_name=pipeline_name,
+        batch_id=context.batch_id,
     )
 
     stages: list[StageResult] = []

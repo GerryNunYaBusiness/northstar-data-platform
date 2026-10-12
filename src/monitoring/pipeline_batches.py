@@ -76,14 +76,20 @@ def begin_or_retry_batch(
     with get_warehouse_connection() as connection:
         row = connection.execute(
             """
-            SELECT PB.[Status]
-            FROM ops.PipelineBatches AS PB
+            SELECT PB.[Status],
+            PB.PipelineName
+            FROM ops.PipelineBatches AS PB WITH (UPDLOCK, HOLDLOCK)
             WHERE PB.BatchID = ?;
             """,
             str(batch_id),
         ).fetchone()
 
         now = datetime.now(timezone.utc)
+        if row is not None and row[1] != pipeline_name:
+            raise ValueError(
+                f"Batch {batch_id} belongs to pipeline "
+                f"'{row[1]}', not '{pipeline_name}'."
+            )
 
         if row is None:
             connection.execute(

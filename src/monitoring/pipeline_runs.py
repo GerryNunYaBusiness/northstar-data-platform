@@ -44,6 +44,7 @@ def pipeline_stage(
 def start_pipeline_run(
     pipeline_run_id: UUID,
     pipeline_name: str,
+    batch_id: UUID | None = None,
 ) -> None:
 
     started_at = datetime.now(timezone.utc)
@@ -57,13 +58,15 @@ def start_pipeline_run(
             (
                 PipelineRunID,
                 PipelineName,
+                BatchID,
                 StartedAt,
                 [Status]
             )
-            VALUES (?, ?, ?, 'RUNNING');
+            VALUES (?, ?, ?, ?, 'RUNNING');
             """,
             str(pipeline_run_id),
             pipeline_name,
+            str(batch_id) if batch_id is not None else None,
             started_at,
         )
 

@@ -30,10 +30,12 @@ x-airflow-common: &airflow-common
   image: northstar-airflow:3.3.1
   environment:
     <<: *airflow-common-env
+    PYTHONPATH: /opt/airflow/src
   volumes:
     - ./dags:/opt/airflow/dags
     - ./logs:/opt/airflow/logs
     - ./plugins:/opt/airflow/plugins
+    - ./src:/opt/airflow/src
 
 services:
 

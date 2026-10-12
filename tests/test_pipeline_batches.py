@@ -2,7 +2,7 @@ from pathlib import Path
 import sys
 from unittest.mock import MagicMock, patch
 from uuid import uuid4
-from datetime import datetime, timezone
+import pytest
 
 SRC_PATH = Path(__file__).resolve().parents[1] / "src"
 

@@ -2,7 +2,6 @@
 Airflow DAG for the Northstar customer data pipeline.
 """
 from datetime import datetime, timedelta
-from multiprocessing import context
 from uuid import NAMESPACE_URL, UUID, uuid4, uuid5
 from dataclasses import dataclass
 from uuid import UUID
@@ -37,11 +36,6 @@ import logging
 
 log = logging.getLogger(__name__)
 
-# from monitoring.alerts import (
-#     LoggingAlertSink,
-#     PipelineFailureContext,
-# )
-
 BRONZE_RETRY_POLICY = ExceptionRetryPolicy(
         rules=[
             RetryRule(
@@ -49,12 +43,7 @@ BRONZE_RETRY_POLICY = ExceptionRetryPolicy(
                 action=RetryAction.FAIL,
                 reason="Data-quality failures are not retryable.",
             ),
-            # RetryRule(
-            #     exception=ConnectionError,
-            #     action=RetryAction.RETRY,
-            #     retry_delay=timedelta(minutes=1),
-            #     reason="Transient connection failure.",
-            # ),
+
             RetryRule(
                 exception=TransientPipelineError,
                 action=RetryAction.RETRY,
@@ -64,32 +53,6 @@ BRONZE_RETRY_POLICY = ExceptionRetryPolicy(
     ]
 )
 
-# def capture_task_failure(context):
-#     task_instance = context["ti"]
-#     exception = context.get("exception")
-
-#     error_type = (
-#         type(exception).__name__
-#         if exception is not None
-#         else "UnknownError"
-#     )
-
-#     error_message = (
-#         str(exception)
-#         if exception is not None
-#         else "Task failed without an exception in callback context."
-#     )
-
-#     task_instance.xcom_push(
-#         key="failure_details",
-#         value={
-#             "task_id": task_instance.task_id,
-#             "error_type": error_type,
-#             "error_message": error_message,
-#             "dag_run_id": task_instance.run_id,
-#             "try_number": task_instance.try_number,
-#         },
-#     )
 
 @dag(
     dag_id="northstar_customer_pipeline",
@@ -121,8 +84,9 @@ def northstar_customer_pipeline():
             )
 
         start_pipeline_run(
-            pipeline_run_id,
-            pipeline_name,
+            pipeline_run_id=pipeline_run_id,
+            pipeline_name=pipeline_name,
+            batch_id=batch_id,
         )
         
         begin_or_retry_batch(
@@ -319,44 +283,6 @@ def northstar_customer_pipeline():
             #alert_sink=LoggingAlertSink(log),
             alert_sink=create_pipeline_alert_sink(log),
         )
-        
-    # @task(trigger_rule=TriggerRule.ONE_FAILED)
-    # def complete_failure(run_info: dict):
-    #     pipeline_run_id = UUID(run_info["pipeline_run_id"]        )
-    #     batch_id = UUID(run_info["batch_id"]        )
-
-    #     error_message = (
-    #         "Airflow customer pipeline failed. "
-    #         "See Airflow task logs for the underlying error."
-    #     )
-
-    #     complete_batch(
-    #         batch_id,
-    #         status="FAILED",
-    #         error_message=error_message,
-    #     )
-
-    #     complete_pipeline_run(
-    #         pipeline_run_id,
-    #         "FAILED",
-    #         error_message=error_message,
-    #     )
-    #     context = PipelineFailureContext(
-    #         pipeline_name="customer_pipeline",
-    #         pipeline_run_id=pipeline_run_id,
-    #         batch_id=batch_id,
-    #         stage_name="airflow",
-    #         error_type="PipelineFailure",
-    #         error_message=error_message,
-    #     )
-
-    #     LoggingAlertSink().send_failure(context)
-
-    
-
-        # print(f"PipelineRunID: {pipeline_run_id}")
-        # print(f"BatchID: {batch_id}")
-        # print("Status: FAILED")
 
     run_info = prepare_run()
     bronze_result = bronze(run_info)
