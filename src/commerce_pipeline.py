@@ -11,6 +11,7 @@ from ingestion.order_items import extract_order_items, load_raw_order_items
 from ingestion.payments import extract_payments, load_raw_payments
 
 from transformation.customers import load_silver_customers, SilverLoadResult
+from transformation.customer_record_processor import process_customer_records
 from transformation.products import load_silver_products
 from transformation.orders import load_silver_orders
 from transformation.order_items import load_silver_order_items
@@ -42,6 +43,7 @@ class CommercePipelineResult:
 CUSTOMERS_PIPELINE = EntityPipeline(
     name="customers",
     extractor=extract_customers,
+    processor=process_customer_records,
     bronze_loader=load_raw_customers,
     silver_loader=load_silver_customers,
 )
@@ -84,8 +86,8 @@ COMMERCE_PIPELINES = [
 
 
 def run_commerce_pipeline(
-    pipeline_run_id: UUID,
-    batch_id: UUID,
+    pipeline_run_id: UUID | None = None,
+    batch_id: UUID | None = None,
 ) -> CommercePipelineResult:
     stages: list[StageResult] = []
 
@@ -99,12 +101,20 @@ def run_commerce_pipeline(
         pipeline_run_id=pipeline_run_id,
         batch_id=batch_id,
     )
+    batch_started = False
+
+    start_pipeline_run(
+        pipeline_run_id=context.pipeline_run_id,
+        pipeline_name=pipeline_name,
+        batch_id=context.batch_id,
+    )
 
     try:
-        start_pipeline_run(
-            pipeline_run_id,
-            pipeline_name,
+        begin_or_retry_batch(
+            batch_id=context.batch_id,
+            pipeline_name=pipeline_name,
         )
+        batch_started = True
 
         for entity in COMMERCE_PIPELINES:
             stages.extend(
@@ -117,6 +127,15 @@ def run_commerce_pipeline(
         #---------------------------------------------------------
         # Process Completion
         #---------------------------------------------------------
+        complete_batch(
+            batch_id=context.batch_id,
+            status="SUCCESS",
+            rows_processed=sum(
+                stage.rows_inserted
+                for stage in stages
+                if stage.stage_name.endswith("_bronze")
+            ),
+        )
 
         complete_pipeline_run(
             pipeline_run_id = pipeline_run_id,
@@ -131,9 +150,13 @@ def run_commerce_pipeline(
         )
     
     except Exception as exc:
-        # fail_pipeline_run(
-        #     pipeline_run_id,
-        # )
+        if batch_started:
+            complete_batch(
+                batch_id=context.batch_id,
+                status="FAILED",
+                error_message=str(exc),
+            )
+            
         complete_pipeline_run(
             pipeline_run_id,
             "FAILED",

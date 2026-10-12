@@ -23,6 +23,10 @@ class EntityPipeline(Generic[TRecord]):
         [UUID, UUID],
         SilverResult,
     ]
+    processor: Callable[
+        [list[TRecord], PipelineContext],
+        list[TRecord],
+    ] | None = None
 
 def execute_entity_pipeline(
     entity: EntityPipeline[TRecord],

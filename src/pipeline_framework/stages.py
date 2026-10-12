@@ -14,13 +14,24 @@ def execute_bronze_stage(
     stage_name: str,
     context: PipelineContext,
     extractor: Callable[[], list[TRecord]],
-    loader: Callable[[list[TRecord], UUID, UUID], int,    ],
+    loader: Callable[[list[TRecord], UUID, UUID], int],
+    processor: Callable[
+        [list[TRecord], PipelineContext],
+        list[TRecord],
+    ] | None = None,
 ) -> StageResult:
+
     with pipeline_stage(
         context.pipeline_run_id,
         stage_name,
     ):
         records = extractor()
+
+        if processor is not None:
+            records = processor(
+                records,
+                context,
+            )
 
         rows_inserted = loader(
             records,

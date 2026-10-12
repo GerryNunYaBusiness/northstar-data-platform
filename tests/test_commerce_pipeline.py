@@ -41,6 +41,8 @@ def test_commerce_pipeline_runs_entities_in_dependency_order(
         patch("commerce_pipeline.start_pipeline_run"        ),
         patch("commerce_pipeline.complete_pipeline_run"        ),
         patch("commerce_pipeline.execute_entity_pipeline", side_effect=execute_entity_side_effect,        ),
+        patch("commerce_pipeline.begin_or_retry_batch") as mock_begin_or_retry_batch,
+        patch("commerce_pipeline.complete_batch") as mock_complete_batch,
     ):
         result = run_commerce_pipeline(
             pipeline_run_id=pipeline_run_id,
@@ -56,6 +58,13 @@ def test_commerce_pipeline_runs_entities_in_dependency_order(
     ]
 
     assert result.status == "SUCCESS"
+    mock_begin_or_retry_batch.assert_called_once_with(
+        batch_id=batch_id,
+        pipeline_name="commerce",
+    )
+
+    mock_complete_batch.assert_called_once()
+    assert mock_complete_batch.call_args.kwargs["status"] == "SUCCESS"
 
 
 def test_commerce_pipeline_stops_after_failed_dependency():
@@ -79,6 +88,8 @@ def test_commerce_pipeline_stops_after_failed_dependency():
         patch("commerce_pipeline.start_pipeline_run"        ) as mock_start_pipeline_run, 
         patch("commerce_pipeline.complete_pipeline_run"        ) as mock_complete_pipeline_run,
         patch("commerce_pipeline.execute_entity_pipeline", side_effect=execute_entity_side_effect,        ),
+        patch("commerce_pipeline.begin_or_retry_batch") as mock_begin_or_retry_batch,
+        patch("commerce_pipeline.complete_batch") as mock_complete_batch,
     ):
         with pytest.raises(RuntimeError, match="Orders pipeline failed",    ):
             run_commerce_pipeline(
@@ -97,6 +108,11 @@ def test_commerce_pipeline_stops_after_failed_dependency():
     mock_complete_pipeline_run.assert_called_once_with(
         pipeline_run_id,
         "FAILED",
+        error_message="Orders pipeline failed",
+    )
+    mock_complete_batch.assert_called_once_with(
+        batch_id=batch_id,
+        status="FAILED",
         error_message="Orders pipeline failed",
     )
 

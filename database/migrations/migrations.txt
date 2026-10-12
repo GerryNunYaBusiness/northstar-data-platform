@@ -1,2 +1,3 @@
 # Applied migrations, in execution order.
 20260918_001_pipeline_events_event_type.sql
+20261008_001_pipeline_runs_batchid.sql

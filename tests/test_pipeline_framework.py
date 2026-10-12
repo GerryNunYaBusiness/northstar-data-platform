@@ -273,3 +273,40 @@ def test_execute_entity_pipeline_runs_bronze_then_silver(
         "bronze",
         "silver",
     ]    
+
+@patch(
+    "pipeline_framework.stages.pipeline_stage",
+    side_effect=lambda *args, **kwargs: nullcontext({}),
+)
+def test_bronze_processor_failure_prevents_loading(
+    mock_pipeline_stage,
+):
+    context = PipelineContext(
+        pipeline_run_id=uuid4(),
+        batch_id=uuid4(),
+    )
+
+    extractor = Mock(return_value=[{"id": 1}])
+    processor = Mock(
+        side_effect=RuntimeError("Validation failed")
+    )
+    loader = Mock(return_value=1)
+
+    with pytest.raises(
+        RuntimeError,
+        match="Validation failed",
+    ):
+        execute_bronze_stage(
+            stage_name="test_bronze",
+            context=context,
+            extractor=extractor,
+            processor=processor,
+            loader=loader,
+        )
+
+    extractor.assert_called_once_with()
+    processor.assert_called_once_with(
+        [{"id": 1}],
+        context,
+    )
+    loader.assert_not_called()
